@@ -1,5 +1,67 @@
 # Changelog
 
+## Unreleased — training with no equipment
+
+This fork is aimed at training at home with nothing but a floor. openGym already logged
+bodyweight work properly (v1.2.4); what it could not do was *plan* it, *progress* it or
+*measure* it. Three things were missing, and they turn out to be the same gap seen from
+three sides: the app assumed progress meant a heavier bar.
+
+### Progress by variation, not by load
+
+- 🪜 **Variation ladders.** Ten movement patterns — push, overhead push, dip, row, pull-up,
+  squat, hip hinge, core hold, leg raise, calf — each a chain of real catalogue exercises
+  ordered easiest to hardest, from a wall push-up to a full planche push-up. v1.2.4 ended
+  a maxed-out push-up with "time to add weight or move to a harder variation" and stopped
+  there, which is correct and useless without a dip belt. The same moment now names the
+  variation, shows you its animation and instructions, and switches your routine to it if
+  you say yes. It only ever offers — nothing is swapped behind your back.
+- **The new rung starts easy on purpose.** A level-up drops back to a third of the reps you
+  maxed out at and to the normal set count, because the extra sets existed precisely because
+  the old variation had got easy. A new variation you cannot finish is one you stop doing.
+- ⬇️ **Stalls go down the ladder.** Bodyweight work that keeps missing its target has no load
+  to strip, so the honest deload is an easier position — and openGym now names that too,
+  instead of holding the same target forever.
+- ⏱️ **Holds have a ceiling as well.** A four-minute plank is a way to be bored. Set a top of
+  the range on a timed hold and it becomes an L-sit rather than a longer plank.
+
+### The app knows what you own
+
+- 🔧 **"What have you got?"** — a kit list: pull-up bar, dip bars, rings, a bench, bands,
+  weights. The library, the exercise picker, the starter plans and the ladders are all
+  filtered to it. A profile that never chooses keeps the whole catalogue, exactly as before.
+- The classifier reads the *movement*, not just the equipment field: a push-up and a one-arm
+  chin-up are both "body weight", but one needs a floor and the other needs something to hang
+  from. Bench dips, floor dips and bar dips are three different setups sharing one word.
+- **Buying a bar grows the ladders** rather than replacing them: your history stays underneath
+  and new rungs appear above the ones you have been training.
+
+### Plans you can actually do
+
+- 🧍 **Two floor-only starter plans** — a three-day full-body plan for getting going, and a
+  bodyweight Push/Pull/Legs split. Every exercise ships with a rep or hold ceiling, so the
+  ladder actually fires. The barbell Push/Pull/Legs plan is still there, marked as needing a
+  gym; the starter action is now a chooser instead of dropping a leg press on you unasked.
+- The bodyweight plan says out loud that pulling without a bar caps out sooner than the rest,
+  because it does — vertical pulling is the one pattern a floor genuinely cannot give you.
+
+### Bodyweight training that shows up in the numbers
+
+- ⚖️ **Volume counts your body.** A floor-only session used to read 0 kg on the workout row,
+  in the calendar and in the month total, because volume was weight × reps. It now counts the
+  share of your body a movement holds, taken from the weigh-in openGym already asks for before
+  every session — a pull-up carries all of you, a push-up about two thirds, a kneeling one
+  less. It counts *mass moved*, not difficulty: a one-arm push-up moves exactly what a push-up
+  moves, and is harder because of the lever. Difficulty is what the ladders are for.
+- **Old sessions correct themselves.** Volume is derived on read rather than trusted from
+  storage, so history logged before this counted is scored properly the moment you update.
+- 🏆 **Rep PRs and hold PRs.** A PR used to mean a heavier top set, which a push-up can never
+  produce — you could train at home for a year and never beat anything. Most reps ever, and
+  longest hold ever, now count.
+- 📈 **The exercise curve is no longer flat at zero.** Bodyweight exercises are charted by top
+  set reps instead of top set weight. Clip on a dip belt and it moves back to load without
+  losing the sessions underneath.
+
 ## v1.2.4 — 2026-08-01
 
 The effort ratings you have been recording since v1.2.3 now answer questions, and bodyweight

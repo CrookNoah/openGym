@@ -1,0 +1,11 @@
+# Dependencies and build output. The frontend builds inside Docker (see web/Dockerfile),
+# so neither of these belongs in the repo — but a local `npm install` in frontend/ for the
+# test suite drops both into the working tree.
+node_modules/
+frontend/dist/
+
+# Local environment
+.env
+
+# macOS
+.DS_Store

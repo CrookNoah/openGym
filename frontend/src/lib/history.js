@@ -1,6 +1,6 @@
 // Pure helpers over the state object S (ported 1:1 from the vanilla app).
 import { todayISO, isoOf, weekKey, fmtNum } from './format.js'
-import { isCardio, isBodyweightEq } from './exercises.js'
+import { isCardio, isBodyweightEq, EXIDX } from './exercises.js'
 import { t } from './i18n.js'
 
 // How an exercise is logged (issue #16). This used to be derived from the body part alone,
@@ -158,6 +158,24 @@ export function bestWeightFor(S, exId) {
   }))
   return best
 }
+/* A PR used to mean one thing: a heavier top set. On a barbell that is the whole story; on a
+   push-up it is unreachable, so somebody training at home could log a year of sessions and
+   never once be told they had beaten anything. These are the other two things that count as
+   getting stronger when the load is fixed — one more rep, and one more second. */
+export function bestRepsFor(S, exId) {
+  let best = 0
+  ;(S.workouts || []).forEach(w => w.entries.forEach(e => {
+    if (e.id === exId) e.sets.forEach(s => { if (s.done && (s.r || 0) > best) best = s.r })
+  }))
+  return best
+}
+export function bestHoldFor(S, exId) {
+  let best = 0
+  ;(S.workouts || []).forEach(w => w.entries.forEach(e => {
+    if (e.id === exId) e.sets.forEach(s => { if (s.done && (s.sec || 0) > best) best = s.sec })
+  }))
+  return best
+}
 export function effectiveRoutineId(S, iso) {
   const ov = S.dayPlan[iso]
   if (ov === 'rest') return null
@@ -203,12 +221,89 @@ export function buildSets(S, cfg) {
   }
   return sets
 }
-export function workoutVolume(w) {
+/* ---- how much of you a bodyweight movement actually lifts ----
+   Volume is weight × reps, and a push-up logs no weight, so a floor-only session came out
+   at 0 kg — no volume on the workout row, a flat line in the calendar, nothing in the month
+   total. The mass was real, it just was not on a bar.
+
+   What is counted is MASS MOVED, not difficulty: a one-arm push-up moves exactly as much of
+   you as a push-up does, and is harder because of the lever, not the load. Difficulty is
+   what the variation ladders are for (lib/ladders.js), and mixing the two here would inflate
+   the number rather than explain it. Fractions are coarse by body part on purpose — the
+   precision to justify per-exercise constants does not exist, and pretending otherwise would
+   be the kg-volume mistake lib/muscles.js already refuses to make. */
+const BW_FRACTION = {
+  back: 1,             // pulling — you hang your whole self from your hands
+  chest: 0.65,         // the push-up family, feet on the floor taking the rest
+  'upper arms': 0.7,   // dips and triceps work
+  shoulders: 0.75,
+  'upper legs': 0.5,   // squats and lunges carry the trunk, not the legs under you
+  'lower legs': 0.9,   // a calf raise carries nearly all of you
+  waist: 0.35,         // core work moves the trunk or the legs, not the whole body
+  'lower arms': 0.3,
+  neck: 0.1,
+  cardio: 0,
+}
+const BW_DEFAULT = 0.5
+// Leverage that takes weight off you: a wall push-up is most of your mass held by your feet,
+// a kneeling one takes a third out. Applied as a multiplier so it composes with the body part.
+const BW_ASSISTED = /(wall|incline|kneeling|on knees|with support|assisted|bench dip|dips floor|elbow dips|scapula)/i
+
+/** Fraction of body weight this exercise supports, 0–1. Unknown ids fall back to BW_DEFAULT. */
+export function bwFraction(idOrEx) {
+  const ex = typeof idOrEx === 'string' ? EXIDX[idOrEx] : idOrEx
+  if (!ex) return BW_DEFAULT
+  const base = BW_FRACTION[ex.bp] != null ? BW_FRACTION[ex.bp] : BW_DEFAULT
+  return BW_ASSISTED.test(ex.n || '') ? Math.round(base * 0.6 * 100) / 100 : base
+}
+
+/**
+ * Volume for one workout, in the profile's unit.
+ *
+ * Loaded sets are weight × reps exactly as before. Bodyweight sets add the share of you the
+ * movement holds, taken from the weigh-in the session was logged at — which is why the app
+ * asks for it before every workout, and why an old session recomputes correctly instead of
+ * needing a migration. A session with no weigh-in and no history to fall back on contributes
+ * nothing rather than a guess, so the number never invents mass it cannot source.
+ */
+export function workoutVolume(w, fallbackBw) {
+  const bw = Number(w && w.bw) > 0 ? Number(w.bw) : (Number(fallbackBw) > 0 ? Number(fallbackBw) : 0)
   let v = 0
   // No special case for unilateral work: a per-side set logs its total, so both sides are
   // already in the rep count that arrives here.
-  w.entries.forEach(e => e.sets.forEach(s => { if (s.done) v += (s.w || 0) * (s.r || 0) }))
-  return v
+  ;(w.entries || []).forEach(e => {
+    const cfg = { ...(e.target || {}), id: e.id }
+    // Timed holds and cardio have no rep count, so they contribute no weight × reps volume —
+    // they are summed separately (holdSeconds) rather than folded in under a unit they do
+    // not share.
+    if (modeOf(cfg) !== 'reps') return
+    const share = isBw(cfg) ? bw * bwFraction(e.id) : 0
+    e.sets.forEach(s => { if (s.done) v += ((s.w || 0) + share) * (s.r || 0) })
+  })
+  return Math.round(v * 10) / 10
+}
+
+/**
+ * Always recompute rather than trust the stored `w.vol`.
+ *
+ * Sessions finished before bodyweight counted carry a stored 0, and everything they need to
+ * be scored properly — the weigh-in, the sets, the prescription — is still on the workout.
+ * Deriving it means that history corrects itself the moment the app updates, which is the
+ * same reason the progression engine never writes back into a finished workout.
+ */
+export const volOf = w => workoutVolume(w)
+
+/** Total reps ticked off in a workout — the honest headline number for bodyweight training. */
+export function repsDone(w) {
+  let n = 0
+  ;(w.entries || []).forEach(e => e.sets.forEach(s => { if (s.done) n += s.r || 0 }))
+  return n
+}
+/** Total seconds held in a workout, across every timed set. */
+export function holdSeconds(w) {
+  let n = 0
+  ;(w.entries || []).forEach(e => e.sets.forEach(s => { if (s.done) n += s.sec || 0 }))
+  return n
 }
 export function setsDone(w) {
   let n = 0

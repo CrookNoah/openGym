@@ -18,6 +18,7 @@
 
 import { modeOf, repStep } from './history.js'
 import { EXIDX } from './exercises.js'
+import { nextRung, prevRung, rungName, isHeldRung } from './ladders.js'
 
 export const POLICIES = ['off', 'linear', 'greyskull', 'double', 'time']
 
@@ -63,6 +64,33 @@ export const DEFAULT_SEC_INCREMENT = 5
 // Where adding another set of push-ups stops being progress and starts being a way to spend
 // an evening. Past this the honest advice is load or a harder variation (issue #33).
 export const MAX_BW_SETS = 6
+
+/**
+ * The dead end at the top of a bodyweight exercise, answered.
+ *
+ * #33 stopped at "time to add weight or move to a harder variation", which is correct and
+ * useless: without a dip belt there is no weight to add, and the app knew of no variation.
+ * lib/ladders.js supplies one, so the same moment becomes an offer with a name on it.
+ *
+ * It only ever *offers*. Swapping the exercise in someone's routine is a decision for a
+ * person — the same reasoning that stopped #33 auto-loading the bar — so this returns the
+ * suggestion and the workout screen puts a button on it.
+ */
+function levelUp(S, cfg, policy, why) {
+  const id = nextRung(S, cfg.id)
+  if (!id) return null
+  return { policy, kind: 'levelup', nextId: id, held: isHeldRung(id), why: [...why, rungName(id)] }
+}
+// The mirror image: bodyweight work that keeps missing has no load to strip, so the only
+// real deload is an easier variation. Same rule — named, never applied behind your back.
+function levelDown(S, cfg, policy, stalls) {
+  const id = prevRung(S, cfg.id)
+  if (!id) return null
+  return {
+    policy, kind: 'regress', nextId: id, held: isHeldRung(id),
+    why: ['Short of the target {0} sessions running — there is no weight to strip, so drop to {1} and build back up.', stalls, rungName(id)],
+  }
+}
 
 // The policy in force for one exercise: its own override, else the routine's default, else
 // the mode's default. Reps keeps behaving the way the app always did (all reps → add a step).
@@ -170,15 +198,31 @@ export function nextPrescription(S, cfg, routine) {
   const deloadAt = DELOAD_AFTER[policy] || 3
 
   if (mode === 'time') {
+    const cur = last.goal || cfg.sec || 0
     if (last.ok) {
-      const sec = (last.goal || cfg.sec || 0) + inc
+      const sec = cur + inc
+      // A hold has the same ceiling problem a rep count has: a four-minute plank is a way to
+      // be bored, not a way to get stronger. Past the ceiling the ladder takes over — a
+      // longer plank becomes an L-sit — and without one the target simply stops climbing.
+      const top = cfg.secMax > 0 ? cfg.secMax : 0
+      if (top > 0 && sec > top) {
+        const up = levelUp(S, cfg, policy, ['Held {0}s in every set — you have outgrown this. Move up to {1}.', cur])
+        if (up) return { ...up, sec: cur }
+        return { policy, kind: 'hold', sec: cur, why: ['Held {0}s in every set — at the top of the range you set, so hold here.', cur] }
+      }
       return { policy, kind: 'up', sec, why: ['Held every set for the full time — target up by {0}s.', inc] }
     }
     if (stalls >= deloadAt) {
-      const sec = deloadTo(last.goal || cfg.sec || 0, 5)
+      // A bodyweight hold has nothing to take off the bar; the honest deload is an easier
+      // position. Only when there is no easier rung does it fall back to cutting the clock.
+      if (last.weight <= 0) {
+        const down = levelDown(S, cfg, policy, stalls)
+        if (down) return { ...down, sec: cur }
+      }
+      const sec = deloadTo(cur, 5)
       return { policy, kind: 'deload', sec, why: ['Short {0} sessions in a row — back off to {1}s and build up again.', stalls, sec] }
     }
-    return { policy, kind: 'hold', sec: last.goal || cfg.sec, why: ['Last time came up short — same target again.'] }
+    return { policy, kind: 'hold', sec: cur, why: ['Last time came up short — same target again.'] }
   }
 
   const w = last.weight
@@ -189,7 +233,16 @@ export function nextPrescription(S, cfg, routine) {
   // belongs on the normal policies, and a barbell lift logged at 0 has nothing to add to.
   if (w <= 0) {
     const goal = last.goal || cfg.reps || 0
-    if (!last.ok || goal <= 0) return { policy, kind: 'hold', weight: 0, reps: goal || undefined, why: ['Bodyweight — same target again until every set is clean.'] }
+    if (!last.ok || goal <= 0) {
+      // Missing the same target session after session is the bodyweight equivalent of a
+      // stalled barbell lift, and gets the same answer in the only currency available:
+      // less leverage, not less weight.
+      if (goal > 0 && stalls >= deloadAt) {
+        const down = levelDown(S, cfg, policy, stalls)
+        if (down) return { ...down, weight: 0, reps: goal }
+      }
+      return { policy, kind: 'hold', weight: 0, reps: goal || undefined, why: ['Bodyweight — same target again until every set is clean.'] }
+    }
     // A ceiling turns "+1 rep forever" into a plan (issue #33). Past the top of the range the
     // reps go back to the bottom and a set is added instead, which is how bodyweight work
     // actually progresses once a set of 30 push-ups stops being a strength stimulus.
@@ -198,8 +251,10 @@ export function nextPrescription(S, cfg, routine) {
       const sets = Math.max(1, cfg.sets || last.count || 1) + 1
       const bottom = Math.max(1, Math.min(cfg.reps || top, top))
       if (sets <= MAX_BW_SETS) return { policy, kind: 'up', weight: 0, reps: bottom, sets, why: ['{0} reps in every set — add a set and go back to {1}.', goal, bottom] }
-      // Out of sets worth adding: more volume is no longer the answer, load or a harder
-      // variation is — and that is a decision for a person, not a policy.
+      // Out of sets worth adding: more volume is no longer the answer, less leverage is.
+      // The ladder names the variation; the decision to take it stays with a person.
+      const up = levelUp(S, cfg, policy, ['{0} sets of {1} — you have outgrown this. Move up to {2}.', sets - 1, goal])
+      if (up) return { ...up, weight: 0, reps: goal }
       return { policy, kind: 'hold', weight: 0, reps: goal, why: ['{0} sets of {1} — time to add weight or move to a harder variation.', sets - 1, goal] }
     }
     // Unilateral work steps by two, so the total stays even and both sides get the rep.

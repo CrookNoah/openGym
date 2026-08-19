@@ -450,3 +450,126 @@ describe('applyPrescription', () => {
     expect(applyPrescription(sets, { kind: 'up', weight: 60, sets: 1 })).toHaveLength(sets.length)
   })
 })
+
+/* ---- climbing a variation ladder (lib/ladders.js) ----
+   The dead end #33 left behind: at the top of a bodyweight rep range with no belt to add,
+   the app used to say "add weight or move to a harder variation" and stop. It now names the
+   variation, for exercises it has a ladder for — and still stops for the ones it does not,
+   which is what keeps every test above this line passing unchanged. */
+describe('variation ladders', () => {
+  const PUSHUP = '0662'         // push-up → close-grip push-up
+  const KNEEL = '3211'          // the rung below a push-up
+  const PLANK = '3665'          // power point plank → front plank with twist
+  const FLOOR = { gear: [] }
+
+  const maxedOut = (id, gear) => ({
+    unit: 'kg', ...(gear ? { gear } : {}),
+    workouts: [{
+      d: '2026-03-01',
+      entries: [{ id, target: { sets: 6, reps: 20, weight: 0, mode: 'reps' }, sets: Array(6).fill({ w: 0, r: 20, done: true }) }]
+    }]
+  })
+  const cfgAt = id => ({ id, sets: 6, reps: 20, repsMax: 20, weight: 0, mode: 'reps', prog: 'linear' })
+
+  it('offers the next harder variation once more sets stop being the answer', () => {
+    const p = nextPrescription(maxedOut(PUSHUP), cfgAt(PUSHUP))
+    expect(p.kind).toBe('levelup')
+    expect(p.nextId).toBe('0259')             // close-grip push-up
+    expect(p.held).toBe(false)
+    expect(p.why[p.why.length - 1]).toBe('close-grip push-up')
+  })
+
+  it('leaves the session it is in alone — the offer is for next time', () => {
+    const p = nextPrescription(maxedOut(PUSHUP), cfgAt(PUSHUP))
+    expect(p.weight).toBe(0)
+    expect(p.reps).toBe(20)                   // today is still a push-up day
+    const sets = applyPrescription([{ w: 0, r: 20, done: false }], p)
+    expect(sets).toHaveLength(1)
+    expect(sets[0].r).toBe(20)
+  })
+
+  it('still dead-ends honestly for an exercise with no ladder', () => {
+    const p = nextPrescription(maxedOut(LIFT), cfgAt(LIFT))
+    expect(p.kind).toBe('hold')
+    expect(p.nextId).toBeUndefined()
+    expect(p.why[0]).toMatch(/add weight or move to a harder variation/)
+  })
+
+  it('skips a rung the profile has no kit for', () => {
+    // Top of the floor-only row ladder: the next rung up is an inverted row, which needs a
+    // bar, so a floor-only profile is told to hold rather than sent shopping mid-session.
+    const S = maxedOut('3156', [])
+    expect(nextPrescription(S, cfgAt('3156')).kind).toBe('hold')
+    const withBar = { ...maxedOut('3156', ['bar']) }
+    const p = nextPrescription(withBar, cfgAt('3156'))
+    expect(p.kind).toBe('levelup')
+    expect(p.nextId).toBe('0499')
+  })
+
+  it('marks a rung that is a held position rather than a rep count', () => {
+    const S = {
+      unit: 'kg', gear: [],
+      workouts: [{ d: '2026-03-01', entries: [{ id: '0464', target: { sets: 3, sec: 120, mode: 'time' }, sets: Array(3).fill({ sec: 120, w: 0, done: true }) }] }]
+    }
+    const p = nextPrescription(S, { id: '0464', sets: 3, sec: 120, secMax: 120, mode: 'time', prog: 'time' })
+    expect(p.kind).toBe('levelup')
+    expect(p.nextId).toBe('3419')             // l-sit on floor
+    expect(p.held).toBe(true)
+    expect(p.sec).toBe(120)                   // today's hold is unchanged
+  })
+
+  it('keeps adding time while the hold is under its ceiling', () => {
+    const S = {
+      unit: 'kg',
+      workouts: [{ d: '2026-03-01', entries: [{ id: PLANK, target: { sets: 3, sec: 45, mode: 'time' }, sets: Array(3).fill({ sec: 45, w: 0, done: true }) }] }]
+    }
+    const p = nextPrescription(S, { id: PLANK, sets: 3, sec: 45, secMax: 90, mode: 'time', prog: 'time' })
+    expect(p.kind).toBe('up')
+    expect(p.sec).toBe(50)
+  })
+
+  it('drops back a rung when bodyweight reps stall instead of holding forever', () => {
+    const short = {
+      unit: 'kg', gear: [],
+      workouts: [0, 1, 2].map(i => ({
+        d: '2026-04-0' + (i + 1),
+        entries: [{ id: PUSHUP, target: { sets: 3, reps: 12, weight: 0, mode: 'reps' }, sets: [{ w: 0, r: 12, done: true }, { w: 0, r: 9, done: true }, { w: 0, r: 7, done: true }] }]
+      }))
+    }
+    const p = nextPrescription(short, { id: PUSHUP, sets: 3, reps: 12, weight: 0, mode: 'reps', prog: 'linear' })
+    expect(p.kind).toBe('regress')
+    expect(p.nextId).toBe(KNEEL)
+    expect(p.reps).toBe(12)                   // today is unchanged; the drop is an offer
+  })
+
+  it('holds rather than regressing before the stall count is reached', () => {
+    const short = {
+      unit: 'kg', gear: [],
+      workouts: [{ d: '2026-04-01', entries: [{ id: PUSHUP, target: { sets: 3, reps: 12, weight: 0, mode: 'reps' }, sets: [{ w: 0, r: 9, done: true }] }] }]
+    }
+    expect(nextPrescription(short, { id: PUSHUP, sets: 3, reps: 12, weight: 0, mode: 'reps', prog: 'linear' }).kind).toBe('hold')
+  })
+
+  it('has nothing to drop back to at the bottom of a ladder', () => {
+    const short = {
+      unit: 'kg', gear: [],
+      workouts: [0, 1, 2].map(i => ({
+        d: '2026-04-0' + (i + 1),
+        entries: [{ id: '0659', target: { sets: 3, reps: 12, weight: 0, mode: 'reps' }, sets: [{ w: 0, r: 5, done: true }] }]
+      }))
+    }
+    expect(nextPrescription(short, { id: '0659', sets: 3, reps: 12, weight: 0, mode: 'reps', prog: 'linear' }).kind).toBe('hold')
+  })
+
+  it('goes back to following the load the moment a belt is involved', () => {
+    // A dip with weight on it has something to add, so it leaves the ladder logic entirely.
+    const S = {
+      unit: 'kg', gear: [],
+      workouts: [{ d: '2026-03-01', entries: [{ id: PUSHUP, target: { sets: 6, reps: 20, weight: 10, mode: 'reps' }, sets: Array(6).fill({ w: 10, r: 20, done: true }) }] }]
+    }
+    const p = nextPrescription(S, { ...cfgAt(PUSHUP), weight: 10 })
+    expect(p.kind).toBe('up')
+    expect(p.weight).toBeGreaterThan(10)
+    expect(p.nextId).toBeUndefined()
+  })
+})

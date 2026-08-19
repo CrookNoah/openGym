@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { fmtVol, isoOf, todayISO, MONTHS } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
+import { volOf } from '../lib/history.js'
 
 // GitHub-style activity heatmap, shaded by time trained per day.
 export default function Heatmap({ S, onDay }) {
@@ -10,7 +11,7 @@ export default function Heatmap({ S, onDay }) {
   const agg = {}
   S.workouts.forEach(w => {
     const a = agg[w.d] = agg[w.d] || { n: 0, vol: 0, min: 0 }
-    a.n++; a.vol += w.vol || 0
+    a.n++; a.vol += volOf(w)
     a.min += Math.max(0, Math.round(((w.end || w.start) - w.start) / 60000))
   })
   const mins = Object.values(agg).map(a => a.min).filter(v => v > 0).sort((a, b) => a - b)

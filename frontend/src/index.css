@@ -589,6 +589,17 @@ h4.sec{
 }
 .progline.warn{color:var(--yellow)}
 .progline svg{flex:none;margin-top:2px}
+/* When the engine has a variation to offer (lib/ladders.js) the same line becomes the way
+   to take it, so it needs to read as pressable without turning into another loud button. */
+.progline.tappable{
+  width:100%;text-align:left;align-items:center;
+  padding:9px 11px;margin:8px 0 2px;border-radius:11px;
+  background:color-mix(in srgb,var(--acc) 11%,transparent);
+}
+.progline.tappable.warn{background:color-mix(in srgb,var(--yellow) 12%,transparent)}
+.progline.tappable svg{margin-top:0}
+.progline.tappable .chev{margin-left:auto;opacity:.5;font-size:12px}
+.progline.tappable:active{opacity:.7}
 
 /* start a timed set (issue #16) — sits where you'd otherwise reach for the checkbox */
 .setrow .setgo{

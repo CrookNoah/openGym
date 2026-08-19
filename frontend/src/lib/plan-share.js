@@ -44,6 +44,9 @@ function cleanEx(e) {
   if (e.inc > 0) o.inc = e.inc
   if (e.repsMin != null) o.repsMin = e.repsMin
   if (e.repsMax != null) o.repsMax = e.repsMax
+  // The hold equivalent of repsMax — without it a shared plan loses the point at which
+  // its planks are supposed to become an L-sit.
+  if (e.secMax != null) o.secMax = e.secMax
   if (e.sg) o.sg = e.sg
   return o
 }

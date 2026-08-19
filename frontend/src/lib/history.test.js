@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { modeOf, isTimed, fmtSec, setLabel, defaultConfig, buildSets, exLine, workoutVolume, effortOf, stepEffort, capEffort, isBw, isPerSide, sideReps, repStep } from './history.js'
+import { modeOf, isTimed, fmtSec, setLabel, defaultConfig, buildSets, exLine, workoutVolume, volOf, bwFraction, repsDone, holdSeconds, bestRepsFor, bestHoldFor, effortOf, stepEffort, capEffort, isBw, isPerSide, sideReps, repStep } from './history.js'
 import { EXDB } from './exercises.js'
 
 // Real ids out of the shipped catalogue, so the body-part fallback is exercised for real.
@@ -391,8 +391,125 @@ describe('workoutVolume', () => {
     expect(workoutVolume(w)).toBe(320)
   })
 
-  it('leaves an unloaded bodyweight set at zero volume rather than inventing a number', () => {
+  it('contributes nothing for a bodyweight set with no weigh-in to source the mass from', () => {
     const w = { entries: [{ id: BW, target: { bodyweight: true }, sets: [{ w: 0, r: 20, done: true }] }] }
     expect(workoutVolume(w)).toBe(0)
+  })
+})
+
+/* ---- bodyweight volume ----
+   A floor-only session used to come out at 0 kg on the workout row, in the calendar and in
+   the month total, because volume was weight × reps and a push-up logs no weight. The mass
+   was real; it just was not on a bar, and the weigh-in the app already asks for before every
+   session is where it comes from. */
+describe('workoutVolume — bodyweight', () => {
+  const PUSHUP = '0662'
+  const PULLUP = '0652'
+
+  it('counts the share of you the movement holds, from the session weigh-in', () => {
+    const w = { bw: 80, entries: [{ id: PUSHUP, target: { bodyweight: true, mode: 'reps' }, sets: [{ w: 0, r: 10, done: true }] }] }
+    expect(workoutVolume(w)).toBe(520)              // 80 × 0.65 × 10
+  })
+
+  it('knows a pull-up carries all of you and a push-up does not', () => {
+    const push = { bw: 80, entries: [{ id: PUSHUP, target: { bodyweight: true }, sets: [{ w: 0, r: 10, done: true }] }] }
+    const pull = { bw: 80, entries: [{ id: PULLUP, target: { bodyweight: true }, sets: [{ w: 0, r: 10, done: true }] }] }
+    expect(workoutVolume(pull)).toBeGreaterThan(workoutVolume(push))
+    expect(workoutVolume(pull)).toBe(800)
+  })
+
+  it('takes weight off an easier variation', () => {
+    const full = { bw: 80, entries: [{ id: PUSHUP, target: { bodyweight: true }, sets: [{ w: 0, r: 10, done: true }] }] }
+    const knees = { bw: 80, entries: [{ id: '3211', target: { bodyweight: true }, sets: [{ w: 0, r: 10, done: true }] }] }
+    expect(workoutVolume(knees)).toBeLessThan(workoutVolume(full))
+  })
+
+  it('adds a dip belt on top of the bodyweight share rather than replacing it', () => {
+    const w = { bw: 80, entries: [{ id: PUSHUP, target: { bodyweight: true }, sets: [{ w: 10, r: 10, done: true }] }] }
+    expect(workoutVolume(w)).toBe(620)              // (80 × 0.65 + 10) × 10
+  })
+
+  it('ignores sets that were never checked off', () => {
+    const w = { bw: 80, entries: [{ id: PUSHUP, target: { bodyweight: true }, sets: [{ w: 0, r: 10, done: true }, { w: 0, r: 10, done: false }] }] }
+    expect(workoutVolume(w)).toBe(520)
+  })
+
+  it('falls back to a supplied body weight when the session was not weighed in', () => {
+    const w = { entries: [{ id: PUSHUP, target: { bodyweight: true }, sets: [{ w: 0, r: 10, done: true }] }] }
+    expect(workoutVolume(w)).toBe(0)
+    expect(workoutVolume(w, 80)).toBe(520)
+  })
+
+  it('leaves a loaded barbell lift exactly where it was', () => {
+    const w = { bw: 80, entries: [{ id: LIFT, sets: [{ w: 60, r: 10, done: true }] }] }
+    expect(workoutVolume(w)).toBe(600)
+  })
+
+  it('still leaves holds and cardio out — they are not weight × reps', () => {
+    const w = { bw: 80, entries: [
+      { id: '3665', target: { mode: 'time', bodyweight: true }, sets: [{ sec: 60, w: 0, done: true }] },
+      { id: CARDIO, sets: [{ min: 20, speed: 9, done: true }] }
+    ] }
+    expect(workoutVolume(w)).toBe(0)
+  })
+})
+
+describe('bwFraction', () => {
+  it('reads a fraction off the body part', () => {
+    expect(bwFraction('0652')).toBe(1)              // pull-up — back
+    expect(bwFraction('0662')).toBe(0.65)           // push-up — chest
+  })
+
+  it('discounts an assisted variation', () => {
+    expect(bwFraction('3211')).toBeLessThan(bwFraction('0662'))
+    expect(bwFraction('0659')).toBeLessThan(bwFraction('0662'))   // wall push-up
+  })
+
+  it('answers for an exercise it has never heard of', () => {
+    expect(bwFraction('zzzz')).toBe(0.5)
+    expect(bwFraction(null)).toBe(0.5)
+  })
+})
+
+describe('volOf', () => {
+  it('recomputes rather than trusting a stored zero from before bodyweight counted', () => {
+    const w = { vol: 0, bw: 80, entries: [{ id: '0662', target: { bodyweight: true }, sets: [{ w: 0, r: 10, done: true }] }] }
+    expect(volOf(w)).toBe(520)
+  })
+})
+
+describe('repsDone and holdSeconds', () => {
+  const w = { entries: [
+    { id: '0662', sets: [{ w: 0, r: 12, done: true }, { w: 0, r: 10, done: true }, { w: 0, r: 8, done: false }] },
+    { id: '3665', target: { mode: 'time' }, sets: [{ sec: 45, w: 0, done: true }, { sec: 40, w: 0, done: true }] }
+  ] }
+  it('totals only what was actually logged', () => {
+    expect(repsDone(w)).toBe(22)
+    expect(holdSeconds(w)).toBe(85)
+  })
+  it('copes with an empty workout', () => {
+    expect(repsDone({})).toBe(0)
+    expect(holdSeconds({ entries: [] })).toBe(0)
+  })
+})
+
+/* A PR used to mean a heavier top set, which a push-up can never produce — so somebody
+   training at home could log a year of sessions and never beat anything. */
+describe('bestRepsFor and bestHoldFor', () => {
+  const S = { workouts: [
+    { d: '2026-01-01', entries: [{ id: '0662', sets: [{ w: 0, r: 12, done: true }, { w: 0, r: 20, done: false }] }] },
+    { d: '2026-01-08', entries: [{ id: '0662', sets: [{ w: 0, r: 15, done: true }] }, { id: '3665', sets: [{ sec: 50, done: true }] }] },
+    { d: '2026-01-15', entries: [{ id: '3665', sets: [{ sec: 70, done: true }, { sec: 90, done: false }] }] }
+  ] }
+
+  it('finds the most reps ever logged, ignoring sets never checked off', () => {
+    expect(bestRepsFor(S, '0662')).toBe(15)
+  })
+  it('finds the longest hold ever logged', () => {
+    expect(bestHoldFor(S, '3665')).toBe(70)
+  })
+  it('is zero for an exercise with no history', () => {
+    expect(bestRepsFor(S, '0652')).toBe(0)
+    expect(bestHoldFor({ workouts: [] }, '3665')).toBe(0)
   })
 })
