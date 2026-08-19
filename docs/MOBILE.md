@@ -61,11 +61,46 @@ accounts, no store rules, no yearly fees between you and an open-source app.
 
 ### Android — sideload the APK
 
-The official signed APK is at **[opengym.duarte-santos.ch](https://opengym.duarte-santos.ch)**.
-Android asks you to allow installs from the browser the first time — that's standard for any
-app outside the Play Store.
+The upstream project's signed APK is at
+**[opengym.duarte-santos.ch](https://opengym.duarte-santos.ch)**. Android asks you to allow
+installs from the browser the first time — that's standard for any app outside the Play Store.
 
-To build and sign your own:
+#### Let GitHub build it (`.github/workflows/android.yml`)
+
+This fork builds the APK in CI, so you never need Android Studio on your own machine:
+
+- **Every push** to `main` or a `claude/**` branch runs the test suite and attaches the APK
+  to the workflow run. Grab it from the run's **Artifacts** section (Actions → the run →
+  scroll down), or trigger one by hand with **Run workflow**.
+- **Pushing a `v*` tag** additionally publishes a GitHub Release with the APK attached, which
+  is the link you can open directly on a phone.
+
+  ```sh
+  git tag v1.3.0 && git push origin v1.3.0
+  ```
+
+Without any setup the workflow publishes the **debug-signed** APK. It installs and runs
+normally — the catch is that it carries Android's public debug key, so a later release-signed
+build can't upgrade it in place. To get a properly signed APK, create a keystore once and add
+four repository secrets (Settings → Secrets and variables → Actions):
+
+```sh
+keytool -genkeypair -keystore my.keystore -alias opengym -keyalg RSA -validity 10950
+base64 -w0 my.keystore          # → paste as ANDROID_KEYSTORE_BASE64
+```
+
+| Secret | What it is |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | the base64 above |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore password |
+| `ANDROID_KEY_ALIAS` | `opengym`, or whatever alias you chose |
+| `ANDROID_KEY_PASSWORD` | key password (often the same as the keystore one) |
+
+**Back the keystore up somewhere safe.** Android refuses to install an update signed with a
+different key, and the only way out is uninstalling the app — which deletes the training log
+with it.
+
+#### Or build and sign it yourself
 
 ```sh
 cd frontend && npm run build:mobile

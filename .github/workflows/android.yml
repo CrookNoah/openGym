@@ -1,0 +1,177 @@
+name: Android APK
+
+# Builds the sideloadable Android app (docs/MOBILE.md) from the Capacitor project in
+# frontend/android.
+#
+# Every push gets an APK as a workflow artifact — installable on a phone, no secrets
+# needed, so this is useful from the very first run. Pushing a v* tag additionally
+# publishes a GitHub Release with the APK attached.
+#
+# Signing: a release APK straight out of Gradle is unsigned, and Android refuses to install
+# an unsigned APK. Add the four ANDROID_* secrets below and this signs it for you; leave
+# them out and the debug-signed APK is published instead, which installs fine — it is only
+# unsuitable for the long run because its key is Android's well-known public debug key.
+#
+#   ANDROID_KEYSTORE_BASE64    base64 of your keystore   (base64 -w0 my.keystore)
+#   ANDROID_KEYSTORE_PASSWORD  keystore password
+#   ANDROID_KEY_ALIAS          key alias inside the keystore
+#   ANDROID_KEY_PASSWORD       key password (often the same as the keystore password)
+#
+# KEEP THE KEYSTORE. Android will not install an update signed with a different key, and
+# the only way out is uninstalling — which deletes the training log with it.
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    tags: ['v*']
+  workflow_dispatch:
+
+# A newer push supersedes an in-flight build of the same ref — except on a tag, where the
+# run is publishing a release and has to be left to finish.
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # only the tag-triggered release step needs this
+    env:
+      # Read the keystore secret into env so the signing steps can test it in `if:` —
+      # the secrets context is not available there, but env is.
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # The training logic is pure functions with tests next to them (README, "Tech").
+      # A broken engine is not worth shipping to a phone that has no way to roll back.
+      - name: Run the test suite
+        working-directory: frontend
+        run: npm test
+
+      - name: Check every locale carries the same keys
+        working-directory: frontend
+        run: node scripts/check-locales.mjs
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21          # Gradle 8.11.1 + AGP 8.7.2, per docs/MOBILE.md
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install the SDK pieces the build needs
+        # compileSdk/targetSdk 35 come from frontend/android/variables.gradle. Installing
+        # them explicitly stops the build depending on whatever the runner image happens
+        # to ship this month, and puts zipalign/apksigner on disk for the signing step.
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build the web bundle and sync it into the Android project
+        working-directory: frontend
+        # Android-only on purpose: the repo also carries an ios/ project, and a plain
+        # `cap sync` would try to run CocoaPods for it, which cannot work on Linux.
+        run: npm run build:mobile:android
+
+      - name: Assemble APKs
+        working-directory: frontend/android
+        run: ./gradlew --no-daemon assembleDebug assembleRelease
+
+      - name: Read versions
+        id: ver
+        run: |
+          set -euo pipefail
+          echo "version=$(node -p "require('./frontend/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "code=$(grep -oP 'versionCode\s+\K\d+' frontend/android/app/build.gradle)" >> "$GITHUB_OUTPUT"
+          echo "name=$(grep -oP 'versionName\s+"\K[^"]+' frontend/android/app/build.gradle)" >> "$GITHUB_OUTPUT"
+
+      - name: Warn if the Android version drifted from package.json
+        # docs/MOBILE.md: versionName tracks package.json, and versionCode must strictly
+        # increase or Android will not install the update over an existing copy. Neither is
+        # worth failing a build over, but both are worth saying out loud before a release.
+        if: steps.ver.outputs.name != steps.ver.outputs.version
+        run: |
+          echo "::warning::android versionName is ${{ steps.ver.outputs.name }} but package.json is ${{ steps.ver.outputs.version }} — bump versionName/versionCode in frontend/android/app/build.gradle before tagging a release."
+
+      # ---- signing (only when the secrets are configured) ----
+      - name: Sign the release APK
+        if: env.KEYSTORE_B64 != ''
+        working-directory: frontend/android/app/build/outputs/apk/release
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          echo "$KEYSTORE_B64" | base64 -d > release.keystore
+          "$BT/zipalign" -f -p 4 app-release-unsigned.apk aligned.apk
+          "$BT/apksigner" sign \
+            --ks release.keystore \
+            --ks-pass "env:KS_PASS" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass "env:KEY_PASS" \
+            --out signed.apk aligned.apk
+          "$BT/apksigner" verify --print-certs signed.apk
+          rm -f release.keystore aligned.apk
+
+      - name: Collect the APKs
+        id: collect
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          V="${{ steps.ver.outputs.version }}"
+          S="${{ steps.ver.outputs.sha }}"
+          REL=frontend/android/app/build/outputs/apk/release/signed.apk
+          cp frontend/android/app/build/outputs/apk/debug/app-debug.apk "out/openGym-$V-$S-debug.apk"
+          if [ -f "$REL" ]; then
+            cp "$REL" "out/openGym-$V-$S.apk"
+            echo "asset=out/openGym-$V-$S.apk" >> "$GITHUB_OUTPUT"
+            echo "note=Signed with the project release key." >> "$GITHUB_OUTPUT"
+          else
+            # No keystore configured. The debug APK is the one that installs, so that is
+            # what gets published — labelled as such, not quietly passed off as a release.
+            echo "asset=out/openGym-$V-$S-debug.apk" >> "$GITHUB_OUTPUT"
+            echo "note=**Debug-signed build.** No release keystore is configured for this repository, so this APK carries Android's public debug key. It installs and runs, but a later release-signed build cannot upgrade it — that needs an uninstall first, which deletes the training log, so export a backup before you switch." >> "$GITHUB_OUTPUT"
+          fi
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openGym-apk-${{ steps.ver.outputs.version }}-${{ steps.ver.outputs.sha }}
+          path: out/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # ---- publish on a v* tag ----
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          files: ${{ steps.collect.outputs.asset }}
+          generate_release_notes: true
+          body: |
+            Sideload this APK: download it on the phone, then allow your browser to install
+            unknown apps when Android asks. Full instructions in [docs/MOBILE.md](docs/MOBILE.md).
+
+            The mobile build has no account and no server — everything stays on the phone,
+            and backups go out through the share sheet.
+
+            ${{ steps.collect.outputs.note }}
