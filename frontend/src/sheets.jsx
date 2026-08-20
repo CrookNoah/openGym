@@ -23,6 +23,7 @@ import { buildPlanBundle, parsePlan, mergePlan, printPlan } from './lib/plan-sha
 import { estimate1RM, best1RM, is1RMRecord, REP_CAP } from './lib/onerm.js'
 import { nextPrescription, applyPrescription, policyFor, defaultIncrement, POLICIES_FOR, POLICY_NAME, POLICY_DESC, MAX_BW_SETS } from './lib/progression.js'
 import { MOBILE, shareExport } from './lib/mobile.js'
+import { SITES, SITE_NAME, lenUnit, addMeasures, lastOf, validMeasure } from './lib/measure.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -256,6 +257,45 @@ export function bwSheet(opts = {}) {
   const h = ui().openSheet(close => <BwSheet {...opts} close={close} />, { locked: !!opts.required })
   return h
 }
+
+/* ============================ tape measurements ============================ */
+// One form, every site, all optional — a measuring session is however many sites you had the
+// patience for, and each field's placeholder is the last reading so the tape has something
+// to be checked against while it is still around your waist.
+function MeasureSheet({ close }) {
+  const st = useStore(s => s.S)
+  const unit = lenUnit(st)
+  const [v, setV] = useState({})
+  const save = () => {
+    if (!SITES.some(k => validMeasure(v[k], unit))) { toast(t('Enter at least one measurement')); return }
+    let n = 0
+    update(s => { n = addMeasures(s, v) })
+    close()
+    toast(t('{0} measurements saved', n))
+  }
+  return <>
+    <h3>{t('Measurements')}</h3>
+    <div className="muted small" style={{ marginBottom: 12 }}>
+      {t('Same tape, same spots, relaxed — first thing in the morning is the reading that compares across weeks.')}
+    </div>
+    <div className="sect-b">
+      {SITES.map(k => {
+        const last = lastOf(st, k)
+        return <Row key={k} title={t(SITE_NAME[k])}>
+          <span className="row" style={{ gap: 6 }}>
+            <input className="input" inputMode="decimal" style={{ width: 84, textAlign: 'right' }}
+              placeholder={last ? fmtNum(last.y) : '—'} value={v[k] ?? ''}
+              onChange={e => setV(x => ({ ...x, [k]: e.target.value.replace(',', '.') }))} />
+            <span className="dim small" style={{ width: 22 }}>{unit}</span>
+          </span>
+        </Row>
+      })}
+    </div>
+    <div style={{ height: 14 }} />
+    <Button variant="primary" onClick={save}>{t('Save')}</Button>
+  </>
+}
+export function measureSheet() { ui().openSheet(close => <MeasureSheet close={close} />) }
 
 /* ============================ import from another app ============================ */
 // Shows what a parsed export would actually do before anything is written. An import is

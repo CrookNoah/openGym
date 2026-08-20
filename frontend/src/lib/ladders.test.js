@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   LADDERS, HELD_RUNGS, ladderOf, ladderPositions, isOnLadder,
-  nextRung, prevRung, ladderPos, rungsFor, rungName, isHeldRung
+  nextRung, prevRung, ladderPos, rungsFor, rungName, isHeldRung, ladderProgress
 } from './ladders.js'
 import { EXIDX } from './exercises.js'
 import { gearOf } from './gear.js'
@@ -143,6 +143,50 @@ describe('rungsFor', () => {
 
   it('is empty for a ladder that does not exist', () => {
     expect(rungsFor(EVERYTHING, 'nope')).toEqual([])
+  })
+})
+
+describe('ladderProgress', () => {
+  const workout = (d, ids, done = true) => ({
+    d, start: new Date(d + 'T12:00:00').getTime(),
+    entries: ids.map(id => ({ id, sets: [{ r: 10, done }] })),
+  })
+
+  it('reports nothing for a history without ladder work', () => {
+    expect(ladderProgress({ workouts: [] })).toEqual([])
+    expect(ladderProgress({ workouts: [workout('2026-08-01', ['0025'])] })).toEqual([])
+  })
+
+  it('stands you on the most recently trained rung, not the hardest ever touched', () => {
+    const S = { workouts: [
+      workout('2026-06-01', ['0652']),   // tried a full pull-up once in June…
+      workout('2026-08-10', ['0688']),   // …but has done negatives since
+    ] }
+    const pull = ladderProgress(S).find(p => p.key === 'pull')
+    expect(pull.id).toBe('0688')
+    expect(pull.step).toBe(LADDERS.find(l => l.key === 'pull').rungs.indexOf('0688') + 1)
+  })
+
+  it('ignores sets that were never finished', () => {
+    const S = { workouts: [workout('2026-08-10', ['0662'], false)] }
+    expect(ladderProgress(S)).toEqual([])
+  })
+
+  it('counts steps over the rungs this kit can reach', () => {
+    const S = { gear: [], workouts: [workout('2026-08-10', ['3156'])] } // floor-only, top row rung
+    const row = ladderProgress(S).find(p => p.key === 'row')
+    expect(row.atTop).toBe(true)
+    expect(row.total).toBe(rungsFor({ gear: [] }, 'row').length)
+    // The same history with a bar has rungs still above it.
+    const withBar = ladderProgress({ gear: ['bar'], workouts: S.workouts }).find(p => p.key === 'row')
+    expect(withBar.atTop).toBe(false)
+    expect(withBar.total).toBeGreaterThan(row.total)
+  })
+
+  it('reports one entry per ladder trained', () => {
+    const S = { workouts: [workout('2026-08-10', ['0662', '0688', '3132'])] }
+    const keys = ladderProgress(S).map(p => p.key).sort()
+    expect(keys).toEqual(['pull', 'push', 'squat'])
   })
 })
 

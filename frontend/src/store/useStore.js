@@ -25,6 +25,9 @@ export const DEF = {
   // Last answers given to the plan wizard (lib/planner.js), so regenerating does not mean
   // answering everything again. Null until the wizard is used.
   plannerAnswers: null,
+  // Tape measurements (lib/measure.js): flat dated entries like the food log, one per site
+  // per day. Values stay in the unit they were typed in, same as bodyweight.
+  measurements: [],
   // Last day (inclusive) of a deliberately easy week — lib/progression.js prescribes ~60%
   // while it holds and skips those sessions when judging progress. Null = not taking one.
   easyUntil: null,

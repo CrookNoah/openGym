@@ -5,7 +5,7 @@ import { EXIDX } from '../lib/exercises.js'
 import { lastBW, streakWeeks, setLabel, modeOf, effortOf, bestWeightFor } from '../lib/history.js'
 import { fmtNum, fmtDate, fmtVol, todayISO, weekKey } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
-import { bwSheet, goalSheet, calendarSheet, workoutDetailSheet, WorkoutRow, bwDeltaColor } from '../sheets.jsx'
+import { bwSheet, goalSheet, calendarSheet, workoutDetailSheet, WorkoutRow, bwDeltaColor, measureSheet } from '../sheets.jsx'
 import LineChart from '../components/LineChart.jsx'
 import Heatmap from '../components/Heatmap.jsx'
 import Icon from '../components/Icon.jsx'
@@ -13,6 +13,8 @@ import BodyMap, { BodyMapLegend } from '../components/BodyMap.jsx'
 import { loadOfWorkouts, rankOf, MUSCLE_NAME } from '../lib/muscles.js'
 import { e1rmSeries, best1RM } from '../lib/onerm.js'
 import { kcalSeries, avgKcal, weightChangeOver, targetOf } from '../lib/food.js'
+import { ladderProgress, rungName } from '../lib/ladders.js'
+import { SITE_NAME, lenUnit, siteSeries, siteDelta, measuredSites } from '../lib/measure.js'
 import {
   hasEffort, displayScale, scaleName, toScale, avgRir, effortSummary, effortWeeks,
   effortHistogram, isHardSet, HARD_RIR
@@ -169,6 +171,66 @@ function EnergyCard({ S }) {
   </div>
 }
 
+// Where you stand on each variation ladder — the strength chart for training that progresses
+// by changing the exercise instead of the number on the bar. One row per ladder actually
+// trained; the step count runs over the rungs this profile's kit can reach (lib/ladders.js).
+function LaddersCard({ S }) {
+  const prog = ladderProgress(S)
+  if (!prog.length) return null
+  return <div className="card">
+    <h2>{t('Ladders')} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {t('harder variations, not heavier weights')}</span></h2>
+    {prog.map(p => <div key={p.key} style={{ padding: '7px 0', borderBottom: 'var(--hair) solid var(--sep)' }}>
+      <div className="row between small" style={{ marginBottom: 5 }}>
+        <span style={{ fontWeight: 500 }}>{t(p.name)}</span>
+        <span className="dim">{p.atTop ? t('top of the ladder') : t('step {0} of {1}', p.step, p.total)}</span>
+      </div>
+      <div className="wprog"><i style={{ width: Math.round(p.step / Math.max(1, p.total) * 100) + '%', background: p.atTop ? 'var(--yellow)' : undefined }} /></div>
+      <div className="small dim" style={{ marginTop: 4 }}>{rungName(p.id)}</div>
+    </div>)}
+    <div className="small dim" style={{ marginTop: 10 }}>
+      {t('Each bar is a movement pattern, easiest variation to hardest. Top out on one and the progression engine starts offering added weight instead.')}
+    </div>
+  </div>
+}
+
+// The tape against the scale. The scale can sit still for months of honest recomposition;
+// the sites move. Values are shown exactly as they were typed (lib/measure.js).
+function MeasureCard({ S }) {
+  const [site, setSite] = useState(null)
+  const sites = measuredSites(S)
+  const unit = lenUnit(S)
+  const cur = site && sites.includes(site) ? site : sites[0] || null
+  const pts = cur ? siteSeries(S, cur) : []
+  return <div className="card">
+    <div className="row between" style={{ marginBottom: 6 }}>
+      <h2 style={{ margin: 0 }}>{t('Measurements')}</h2>
+      <Button size="sm" icon="plus" onClick={measureSheet}>{t('Log')}</Button>
+    </div>
+    {sites.length ? <>
+      {sites.length > 1 && <div className="sect-b" style={{ marginBottom: 10 }}>
+        <SelectRow title={t('Site')} sheetTitle={t('Measurements')} value={cur} onChange={setSite}
+          options={sites.map(k => ({ value: k, label: t(SITE_NAME[k]) }))} />
+      </div>}
+      {pts.length > 1
+        ? <div className="chart"><LineChart points={pts} h={140} unit={unit} color="var(--teal)" /></div>
+        : <div className="small dim" style={{ margin: '4px 0 8px' }}>{t('One reading so far — the curve starts at two.')}</div>}
+      <div style={{ marginTop: 8 }}>
+        {sites.map(k => {
+          const s = siteSeries(S, k)
+          const last = s[s.length - 1]
+          const d = siteDelta(S, k)
+          return <div key={k} className="mrow">
+            <span className="nm">{t(SITE_NAME[k])}</span>
+            <span className="v">{fmtNum(last.y)} {unit}{d != null && !!d && <span style={{ marginLeft: 6, color: 'var(--label-2)' }}>{(d > 0 ? '+' : '') + fmtNum(d)}</span>}</span>
+          </div>
+        })}
+      </div>
+    </> : <div className="muted small">
+      {t('The scale says what changed — the tape says where. Waist, chest, arms: measure every week or two and this card draws the trend.')}
+    </div>}
+  </div>
+}
+
 // Stats = the analytics hub: all charts, progress and history live here.
 export default function Stats() {
   const nav = useNavigate()
@@ -257,6 +319,7 @@ export default function Stats() {
     </div>
 
     {S.workouts.length > 0 && <MuscleBalance S={S} />}
+    {S.workouts.length > 0 && <LaddersCard S={S} />}
     {(S.food || []).length > 0 && <EnergyCard S={S} />}
     {anyEffort && <EffortCard S={S} />}
 
@@ -302,6 +365,8 @@ export default function Stats() {
         </> : <div className="muted small">{t('Finish your first workout to see progress curves here.')}</div>}
       </div>
     </div>
+
+    <MeasureCard S={S} />
 
     {S.workouts.length > 0 && <>
       <div className="row between" style={{ marginBottom: 10 }}>

@@ -135,6 +135,45 @@ export const rungsFor = (S, key) => {
   return l ? l.rungs.filter(id => reachable(S, id)) : []
 }
 
+/**
+ * Where this profile stands on every ladder it has ever trained — the data behind the
+ * Stats card that answers "am I actually getting anywhere?" for training without a bar
+ * to put more plates on.
+ *
+ * "Where you stand" is the most recently trained rung, not the hardest ever touched: the
+ * ladder is a statement about what you do now, and someone who tried one muscle-up in June
+ * and has done regular pull-ups since stands at pull-ups. Step counts run over reachable
+ * rungs only (same rule as ladderPos); a current rung whose kit has since gone away still
+ * counts the reachable rungs at or below it, so the position stays honest instead of
+ * disappearing.
+ */
+export function ladderProgress(S) {
+  const lastTrained = new Map() // exId → most recent workout time with a done set
+  ;((S && S.workouts) || []).forEach(w => {
+    const when = w.start || new Date(w.d + 'T12:00:00').getTime()
+    ;(w.entries || []).forEach(e => {
+      if (!e.sets || !e.sets.some(s => s.done)) return
+      if ((lastTrained.get(e.id) || 0) < when) lastTrained.set(e.id, when)
+    })
+  })
+  return LADDERS.map(l => {
+    let cur = null, curT = 0
+    l.rungs.forEach(id => {
+      const when = lastTrained.get(id)
+      if (when && when >= curT) { cur = id; curT = when }
+    })
+    if (!cur) return null
+    const avail = l.rungs.filter(id => reachable(S, id))
+    const idx = l.rungs.indexOf(cur)
+    const step = avail.filter(id => l.rungs.indexOf(id) <= idx).length
+    return {
+      key: l.key, name: l.name, id: cur,
+      step, total: avail.length, atTop: step >= avail.length && avail.length > 0,
+      when: curT,
+    }
+  }).filter(Boolean)
+}
+
 /** Display name for a rung id, resolving through the placeholder so it can never throw. */
 export const rungName = id => exOr(id).n
 

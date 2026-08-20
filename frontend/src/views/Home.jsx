@@ -43,6 +43,15 @@ export default function Home() {
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6)
   const wkLabel = weekOffset === 0 ? t('This week') : `${monday.getDate()} ${monday.toLocaleDateString(dateLocale(), { month: 'short' })} – ${sunday.getDate()} ${sunday.toLocaleDateString(dateLocale(), { month: 'short' })}`
 
+  // A planned session that never got logged yesterday, on a day with nothing else scheduled:
+  // the one moment a nudge earns its place. Both buttons are decisions the store remembers —
+  // "do it today" is a day override, "let it go" retro-marks yesterday as rest so neither the
+  // nudge nor the missed-dot keeps litigating it.
+  const yd = new Date(today); yd.setDate(yd.getDate() - 1)
+  const yIso = isoOf(yd)
+  const missedR = effectiveRoutine(S, yIso)
+  const missed = !S.active && missedR && !doneDays.has(yIso) && !routine && !doneDays.has(todayISO())
+
   const wThisWeek = S.workouts.filter(w => weekKey(w.d) === weekKey(todayISO())).length
   const plannedPerWeek = Object.keys(S.week).filter(k => S.week[k]).length
   const bwPoints = S.bodyweight.slice(-30).map(b => ({ t: b.t || new Date(b.d).getTime(), y: b.w, d: b.d }))
@@ -78,6 +87,20 @@ export default function Home() {
           : <Icon name="plus" className="chev" />}
       </div>
     </div>
+
+    {missed && <div className="card" style={{ borderColor: 'var(--yellow)' }}>
+      <div className="row" style={{ gap: 9 }}>
+        <span className="lrow-i" style={{ background: 'var(--yellow)', color: '#000' }}><Icon name="calendar" /></span>
+        <div className="grow">
+          <div className="tt">{t('{0} slipped by yesterday', missedR.name)}</div>
+          <div className="ss">{t('Today is free — move it here, or let it go and carry on with the plan.')}</div>
+        </div>
+      </div>
+      <div className="row" style={{ gap: 8, marginTop: 12 }}>
+        <Button variant="primary" size="sm" onClick={() => update(s => { s.dayPlan[todayISO()] = missedR.id })}>{t('Do it today')}</Button>
+        <Button size="sm" onClick={() => update(s => { s.dayPlan[yIso] = 'rest' })}>{t('Let it go')}</Button>
+      </div>
+    </div>}
 
     {!S.routines.length && !S.active && (
       <div className="card">
