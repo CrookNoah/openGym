@@ -12,6 +12,7 @@ import Icon from '../components/Icon.jsx'
 import BodyMap, { BodyMapLegend } from '../components/BodyMap.jsx'
 import { loadOfWorkouts, rankOf, MUSCLE_NAME } from '../lib/muscles.js'
 import { e1rmSeries, best1RM } from '../lib/onerm.js'
+import { kcalSeries, avgKcal, weightChangeOver, targetOf } from '../lib/food.js'
 import {
   hasEffort, displayScale, scaleName, toScale, avgRir, effortSummary, effortWeeks,
   effortHistogram, isHardSet, HARD_RIR
@@ -129,6 +130,45 @@ function EffortCard({ S }) {
   </div>
 }
 
+// Calories eaten against body weight moved — the pairing that makes either number mean
+// anything. Deliberately no invented TDEE arithmetic: the average and the weight change over
+// the same window are shown side by side, and the reader does the one subtraction that
+// matters. A synthetic "maintenance" figure would be the food log's version of guessing an
+// e1RM from 20 reps.
+function EnergyCard({ S }) {
+  const [win, setWin] = useState(30)
+  const pts = kcalSeries(S, win)
+  const avg = avgKcal(S, win)
+  const dw = weightChangeOver(S, win)
+  const tgt = targetOf(S)
+  return <div className="card">
+    <h2>{t('Energy')} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {t('calories eaten, day by day')}</span></h2>
+    <Segmented className="seg-range" value={win} onChange={setWin}
+      options={[{ value: 14, label: '2W' }, { value: 30, label: '1M' }, { value: 90, label: '3M' }, { value: 0, label: t('All') }]} />
+    {pts.length ? <>
+      <div className="chart"><LineChart points={pts} h={150} unit="kcal" color="var(--orange)" goal={tgt ? tgt.kcal : null} /></div>
+      <div className="row between" style={{ alignItems: 'flex-end', marginTop: 8, gap: 12 }}>
+        <div>
+          <div className="stat-v">{avg == null ? '—' : fmtNum(avg)}</div>
+          <div className="small dim">{t('kcal a day, over {0} logged days', pts.length)}</div>
+        </div>
+        {dw != null && <div style={{ textAlign: 'right' }}>
+          <div className="stat-v" style={{ color: bwDeltaColor(dw, (lastBW(S) || {}).w || 0) }}>{(dw > 0 ? '+' : '') + fmtNum(dw)} {S.unit}</div>
+          <div className="small dim">{t('body weight over the same window')}</div>
+        </div>}
+      </div>
+      <div className="small dim" style={{ marginTop: 8, lineHeight: 1.45 }}>
+        {dw != null
+          ? t('Read them together: this intake moved your weight by that much. Weight flat at this average means you have found your maintenance.')
+          : t('Log your body weight too and this card will pair the intake with what it did.')}
+      </div>
+      {pts.length < (win || 14) * 0.5 && win !== 0 && <div className="small dim" style={{ marginTop: 4 }}>
+        {t('Only {0} of the last {1} days are logged — the average speaks for those days, not the gaps.', pts.length, win)}
+      </div>}
+    </> : <div className="muted small">{t('No food logged in this period.')}</div>}
+  </div>
+}
+
 // Stats = the analytics hub: all charts, progress and history live here.
 export default function Stats() {
   const nav = useNavigate()
@@ -217,6 +257,7 @@ export default function Stats() {
     </div>
 
     {S.workouts.length > 0 && <MuscleBalance S={S} />}
+    {(S.food || []).length > 0 && <EnergyCard S={S} />}
     {anyEffort && <EffortCard S={S} />}
 
     <div className="cols">

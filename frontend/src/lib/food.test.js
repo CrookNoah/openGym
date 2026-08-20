@@ -3,6 +3,7 @@ import {
   normalizeEntry, kcalFromMacros, dayFood, totals, dayTotals, macroSplit,
   targetOf, remaining, suggestProtein, foodDays, kcalSeries, avgKcal,
   addFood, removeFood, updateFood, isEstimate, MACROS, PROTEIN_G_PER_KG,
+  recentFoods, copyDay, weightChangeOver,
 } from './food.js'
 import { parseProduct, scaleProduct } from './foodsearch.js'
 import { parseResult, friendlyError } from './foodai.js'
@@ -251,5 +252,73 @@ describe('friendlyError', () => {
     expect(friendlyError({ status: 500 })).toMatch(/try again/i)
     expect(friendlyError({ message: 'Failed to fetch' })).toMatch(/connection/i)
     expect(typeof friendlyError({})).toBe('string')
+  })
+})
+
+describe('recentFoods', () => {
+  const now = Date.now()
+  const S2 = { food: [
+    { id: '1', d: '2026-08-15', t: now - 4 * 86400000, n: 'Oats', kcal: 300, p: 10, c: 54, f: 6, src: 'db' },
+    { id: '2', d: '2026-08-16', t: now - 3 * 86400000, n: 'oats', kcal: 320, p: 11, c: 56, f: 6, src: 'manual' },
+    { id: '3', d: '2026-08-17', t: now - 2 * 86400000, n: 'Eggs', kcal: 140, p: 12, c: 1, f: 10, src: 'ai' },
+    { id: '4', d: '2020-01-01', t: now - 400 * 86400000, n: 'Ancient pizza', kcal: 900, p: 30, c: 90, f: 40, src: 'manual' },
+  ] }
+
+  it('groups case-insensitively and leads with what is logged most often', () => {
+    const r = recentFoods(S2)
+    expect(r[0].n).toBe('oats')
+    expect(r[0].times).toBe(2)
+  })
+
+  it('represents a group by its most recent numbers — the ones you last corrected', () => {
+    expect(recentFoods(S2)[0].kcal).toBe(320)
+  })
+
+  it('keeps the source, so re-logging an estimate still logs an estimate', () => {
+    expect(recentFoods(S2).find(x => x.n === 'Eggs').src).toBe('ai')
+  })
+
+  it('forgets what you have not eaten in weeks', () => {
+    expect(recentFoods(S2).some(x => x.n === 'Ancient pizza')).toBe(false)
+  })
+
+  it('is empty for an empty log', () => {
+    expect(recentFoods({})).toEqual([])
+  })
+})
+
+describe('copyDay', () => {
+  it('clones a day with fresh identities', () => {
+    const s = { food: [{ id: 'a', d: '2026-08-18', t: 1, n: 'Oats', kcal: 300, p: 10, c: 54, f: 6, src: 'db' }] }
+    const n = copyDay(s, '2026-08-18', '2026-08-19')
+    expect(n).toBe(1)
+    expect(s.food).toHaveLength(2)
+    const copy = s.food[1]
+    expect(copy.d).toBe('2026-08-19')
+    expect(copy.id).not.toBe('a')
+    expect(copy.kcal).toBe(300)
+    expect(copy.src).toBe('db')
+  })
+
+  it('copies nothing from an empty day', () => {
+    const s = { food: [] }
+    expect(copyDay(s, '2026-08-18', '2026-08-19')).toBe(0)
+    expect(s.food).toHaveLength(0)
+  })
+})
+
+describe('weightChangeOver', () => {
+  it('pairs the calorie window with the weight moved across it', () => {
+    const now = Date.now()
+    const S2 = { bodyweight: [
+      { d: '2026-07-25', w: 180, t: now - 25 * 86400000 },
+      { d: '2026-08-18', w: 177.6, t: now - 1 * 86400000 },
+    ] }
+    expect(weightChangeOver(S2, 30)).toBe(-2.4)
+  })
+
+  it('declines to compare fewer than two weigh-ins', () => {
+    expect(weightChangeOver({ bodyweight: [{ d: 'x', w: 180, t: Date.now() }] }, 30)).toBe(null)
+    expect(weightChangeOver({}, 30)).toBe(null)
   })
 })

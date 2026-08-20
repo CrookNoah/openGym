@@ -5,9 +5,10 @@ import { t } from '../lib/i18n.js'
 import { fmtNum, fmtDate, todayISO, isoOf, DAYS } from '../lib/format.js'
 import {
   dayFood, dayTotals, totals, macroSplit, targetOf, remaining,
-  MACROS, MACRO_NAME, SOURCES, isEstimate, avgKcal,
+  MACROS, MACRO_NAME, SOURCES, isEstimate, avgKcal, copyDay,
 } from '../lib/food.js'
 import { addFoodSheet, foodFormSheet, foodTargetSheet } from '../foodsheets.jsx'
+import { useUI } from '../store/useUI.js'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 
@@ -17,6 +18,7 @@ import { Button } from '../components/ui.jsx'
 export default function Food() {
   const nav = useNavigate()
   const S = useStore(s => s.S)
+  const update = useStore(s => s.update)
   const [iso, setIso] = useState(todayISO())
 
   const entries = dayFood(S, iso)
@@ -25,6 +27,7 @@ export default function Food() {
   const left = remaining(S, iso)
   const split = macroSplit(got)
   const isToday = iso === todayISO()
+  const toastCopy = n => useUI.getState().toast(t('{0} items copied from yesterday', n))
 
   const shift = n => {
     const d = new Date(iso + 'T12:00:00')
@@ -102,6 +105,20 @@ export default function Food() {
       <div className="ico"><Icon name="clipboard" /></div>
       {isToday ? t('Nothing logged yet today.') : t('Nothing logged on this day.')}
     </div>}
+
+    {/* Most days are yesterday with different timestamps — one tap covers the common case,
+        and every copied entry stays individually editable. */}
+    {entries.length === 0 && (() => {
+      const y = new Date(iso + 'T12:00:00'); y.setDate(y.getDate() - 1)
+      const yIso = isoOf(y)
+      const yEntries = dayFood(S, yIso)
+      if (!yEntries.length) return null
+      return <Button icon="reset" onClick={() => {
+        let n = 0
+        update(s => { n = copyDay(s, yIso, iso) })
+        toastCopy(n)
+      }}>{t('Copy yesterday ({0} items)', yEntries.length)}</Button>
+    })()}
 
     {entries.length > 0 && <div className="small dim" style={{ margin: '12px 2px' }}>
       {t('Tap anything to correct or remove it.')}

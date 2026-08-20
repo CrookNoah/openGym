@@ -150,6 +150,54 @@ export function avgKcal(S, days) {
   return Math.round(pts.reduce((a, p) => a + p.y, 0) / pts.length)
 }
 
+/**
+ * The things you actually eat, ranked — the answer to food logging's biggest friction, which
+ * is retyping the same breakfast every day.
+ *
+ * Grouped by name (case-insensitive), most-often-logged first with recency as the tie-break,
+ * and each group is represented by its most recent entry — the numbers you last corrected,
+ * not the ones you first guessed. Source rides along: re-logging an AI estimate is still
+ * logging an estimate.
+ */
+export function recentFoods(S, days = 45, limit = 8) {
+  const cutoff = Date.now() - days * 86400000
+  const groups = new Map()
+  ;((S && S.food) || []).forEach(e => {
+    if ((e.t || 0) < cutoff) return
+    const k = String(e.n || '').toLowerCase().trim()
+    if (!k) return
+    const g = groups.get(k) || { n: 0, last: null }
+    g.n++
+    if (!g.last || (e.t || 0) > (g.last.t || 0)) g.last = e
+    groups.set(k, g)
+  })
+  return [...groups.values()]
+    .sort((a, b) => (b.n - a.n) || ((b.last.t || 0) - (a.last.t || 0)))
+    .slice(0, limit)
+    .map(g => ({ n: g.last.n, q: g.last.q, kcal: g.last.kcal, p: g.last.p, c: g.last.c, f: g.last.f, src: g.last.src, times: g.n }))
+}
+
+/** Copy one day's log onto another (inside store.update). Fresh ids, fresh timestamps. */
+export function copyDay(s, fromIso, toIso) {
+  const from = dayFood(s, fromIso)
+  // d must be stripped as well as id/t — normalizeEntry keeps any date the entry carries,
+  // and a copy that keeps yesterday's date is a duplicate, not a copy.
+  from.forEach(e => addFood(s, { ...e, id: undefined, t: undefined, d: undefined }, toIso))
+  return from.length
+}
+
+/**
+ * Body-weight movement across the same window a calorie average covers — the pairing that
+ * makes the average mean something. First and last weigh-ins inside the window; null when
+ * there are not two to compare.
+ */
+export function weightChangeOver(S, days) {
+  const cutoff = days ? Date.now() - days * 86400000 : 0
+  const pts = ((S && S.bodyweight) || []).filter(b => (b.t || new Date(b.d).getTime()) > cutoff)
+  if (pts.length < 2) return null
+  return Math.round((pts[pts.length - 1].w - pts[0].w) * 10) / 10
+}
+
 /* ---- mutations, all called inside store.update ---- */
 export function addFood(s, raw, iso) {
   s.food = s.food || []
