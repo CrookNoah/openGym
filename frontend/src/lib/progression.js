@@ -17,10 +17,14 @@
 // So a session that fell apart can never advance the load as though it had succeeded.
 
 import { modeOf, repStep } from './history.js'
+import { todayISO, fmtDate } from './format.js'
 import { EXIDX } from './exercises.js'
 import { nextRung, prevRung, rungName, isHeldRung } from './ladders.js'
 
 export const POLICIES = ['off', 'linear', 'greyskull', 'double', 'time']
+
+/** Is a deliberately easy week in force today? S.easyUntil is its last day, inclusive. */
+export const easyWeekActive = S => !!(S && S.easyUntil && S.easyUntil >= todayISO())
 
 // Which policies can sensibly drive which logging mode.
 export const POLICIES_FOR = {
@@ -160,6 +164,10 @@ export function sessionsFor(S, exId, fallback) {
   const out = []
   ;(S.workouts || []).forEach(w => {
     const entry = w.entries.find(e => e.id === exId)
+    // A session trained during a deliberate easy week (see easyWeekActive) carries a marker
+    // and is skipped outright: it is neither a hit nor a miss, and judging the week after
+    // against it would either advance off a soft session or deload a lifter for resting.
+    if (entry && entry.target && entry.target.easy) return
     if (entry && entry.sets.some(s => s.done)) out.push({ d: w.d, ...readSession(entry, fallback) })
   })
   return out
@@ -193,6 +201,23 @@ export function nextPrescription(S, cfg, routine) {
   const sessions = sessionsFor(S, cfg.id, cfg).filter(s => s.mode === mode)
   const last = sessions[sessions.length - 1]
   if (!last) return { policy, kind: 'first', why: ['Nothing logged yet — this session sets the baseline.'] }
+
+  // A deliberate easy week (S.easyUntil): everything at about 60% until the date passes.
+  // Weight stays on the bar — cutting reps is the deload that keeps the groove — and the
+  // session is marked so the engine never reads it back as a miss.
+  if (easyWeekActive(S)) {
+    if (mode === 'time') {
+      const sec = Math.max(10, Math.round(((last.goal || cfg.sec || 30) * 0.6) / 5) * 5)
+      return { policy, kind: 'easy', sec, why: ['Easy week — {0}s on purpose. Normal service resumes after {1}.', sec, fmtDate(S.easyUntil)] }
+    }
+    const goal = last.goal || cfg.reps || 0
+    const step = repStep(cfg)
+    const reps = Math.max(step, Math.round((goal * 0.6) / step) * step)
+    return {
+      policy, kind: 'easy', weight: last.weight > 0 ? last.weight : 0, reps,
+      why: ['Easy week — {0} reps instead of {1}, on purpose. Normal service resumes after {2}.', reps, goal, fmtDate(S.easyUntil)],
+    }
+  }
 
   const stalls = stallCount(sessions)
   const deloadAt = DELOAD_AFTER[policy] || 3

@@ -25,6 +25,9 @@ export const DEF = {
   // Last answers given to the plan wizard (lib/planner.js), so regenerating does not mean
   // answering everything again. Null until the wizard is used.
   plannerAnswers: null,
+  // Last day (inclusive) of a deliberately easy week — lib/progression.js prescribes ~60%
+  // while it holds and skips those sessions when judging progress. Null = not taking one.
+  easyUntil: null,
   // effort: which per-set effort scale is logged — 'none' | 'rir' | 'rpe'. null, not 'none', so
   // that a profile which never chose (loaded state is overlaid on DEF, on every path: local,
   // server pull, backup import) still falls back to the `showRir` boolean this replaced and

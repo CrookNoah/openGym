@@ -8,6 +8,7 @@ import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, loadSta
 import { addFoodSheet } from '../foodsheets.jsx'
 import { planWizardSheet } from '../planner.jsx'
 import { dayTotals, targetOf, MACROS, MACRO_NAME } from '../lib/food.js'
+import { easyWeekActive } from '../lib/progression.js'
 import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
@@ -17,6 +18,7 @@ import { glyphOf } from '../lib/glyphs.js'
 export default function Home() {
   const nav = useNavigate()
   const S = useStore(s => s.S)
+  const update = useStore(s => s.update)
   const user = useStore(s => s.user)
   const [weekOffset, setWeekOffset] = useState(0)
 
@@ -119,6 +121,17 @@ export default function Home() {
         <div className="chart" style={{ marginTop: 8 }}><LineChart points={bwPoints} h={130} unit={S.unit} goal={S.targetW} /></div>
       </> : <div className="muted small">{t("No entries yet — log your weight to start the curve. It's also asked before every workout.")}</div>}
     </div>
+
+    {easyWeekActive(S) && <div className="card" style={{ borderColor: 'var(--indigo)' }}>
+      <div className="row" style={{ gap: 9 }}>
+        <span className="lrow-i" style={{ background: 'var(--indigo)' }}><Icon name="moon" /></span>
+        <div className="grow">
+          <div className="tt">{t('Easy week')}</div>
+          <div className="ss">{t('Everything is prescribed lighter until {0}, on purpose.', fmtDate(S.easyUntil))}</div>
+        </div>
+        <Button size="sm" onClick={() => update(s => { s.easyUntil = null })}>{t('End it')}</Button>
+      </div>
+    </div>}
 
     <div className="card tappable" style={{ cursor: 'pointer' }} onClick={() => nav('/food')}>
       <div className="row between" style={{ marginBottom: 6 }}>

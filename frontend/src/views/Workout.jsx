@@ -13,6 +13,7 @@ import { startFlow, exercisePicker, exConfigSheet, exerciseDetailSheet, topWeigh
 import Icon from '../components/Icon.jsx'
 import { Button, Check, NumberField } from '../components/ui.jsx'
 import { nextPrescription, applyPrescription } from '../lib/progression.js'
+import { avgRir, toScale, scaleName } from '../lib/effort.js'
 import { glyphOf } from '../lib/glyphs.js'
 
 /* ---------- start chooser (no active workout) ---------- */
@@ -54,7 +55,7 @@ function Elapsed({ start }) {
 }
 
 /* ---------- one exercise block (reps: weight×reps · time: a held duration · cardio: duration+speed) ---------- */
-function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemoveSet, onStartTimed }) {
+function ExerciseBlock({ entryIdx, compact, planRir, onToggle, onField, onAddSet, onRemoveSet, onStartTimed }) {
   const S = useStore(s => s.S)
   const working = useUI(s => s.work)
   const entry = S.active.entries[entryIdx]
@@ -124,6 +125,18 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
       {best > 0 && <span className="tag nocap">{t('Best:')} {fmtNum(best)} {S.unit}</span>}
     </div>
     {last && <div className="small dim" style={{ marginBottom: 4 }}>{t('Last time')} ({fmtDate(last.d)}): {last.sets.map(s => setLabel(entry.id, s, last.target)).join(', ')}</div>}
+    {/* Auto-regulation, displayed rather than imposed: when the logged effort says last time
+        was far easier than the plan intends, say so — the prescription itself is untouched,
+        because a number typed in tired is not a licence to rewrite the program. */}
+    {(() => {
+      if (planRir == null || !last) return null
+      const felt = avgRir(last.sets)
+      if (felt == null || felt < planRir + 2) return null
+      const k = effortOf(S) === 'none' ? 'rir' : effortOf(S)
+      return <div className="small" style={{ color: 'var(--yellow)', marginBottom: 4, lineHeight: 1.4 }}>
+        {t('Last time you left about {0} {1} in the tank against a target of {2} — this should feel harder than it did.', fmtNum(toScale(k, felt)), scaleName(k), toScale(k, planRir))}
+      </div>
+    })()}
     {plan && plan.why && plan.kind !== 'off' && (plan.nextId
       // Outgrown this variation (or stalled on it): the engine named the next rung, so the
       // line becomes a button rather than advice you have to act on somewhere else.
@@ -133,7 +146,7 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
         <Icon name="chevronRight" className="chev" />
       </button>
       : <div className={'progline' + (plan.kind === 'deload' ? ' warn' : '')}>
-        <Icon name={plan.kind === 'up' ? 'arrowUp' : plan.kind === 'deload' ? 'arrowDown' : 'lightbulb'} />
+        <Icon name={plan.kind === 'up' ? 'arrowUp' : plan.kind === 'deload' ? 'arrowDown' : plan.kind === 'easy' ? 'moon' : 'lightbulb'} />
         <span>{t(...plan.why)}</span>
       </div>)}
     <div className="card" style={{ marginTop: 10, marginBottom: 0 }}>
@@ -166,6 +179,9 @@ function ActiveWorkout() {
   const update = useStore(s => s.update)
   const { startRest, stopRest } = useUI()
   const A = S.active
+  // The effort the generated plan was built around (lib/planner.js). Shown here so the
+  // number the preview promised is the number on screen mid-set, not a memory.
+  const planRir = S.routines.find(r => r.id === A.routineId)?.rir
   const units = supersetUnits(A.entries)
   const cur = Math.min(A.cur, Math.max(0, A.entries.length - 1))
   const unit = A.entries.length ? unitOf(units, cur) : []
@@ -262,7 +278,7 @@ function ActiveWorkout() {
   return <div className="narrow">
     <div className="hdr">
       <button className="iconbtn" aria-label={t('Discard')} onClick={() => confirmSheet({ title: t('Discard workout?'), message: t('The sets you logged in this session will be lost.'), confirmText: t('Discard'), danger: true, onConfirm: () => { update(s => { s.active = null }); stopRest(); nav('/home') } })}><Icon name="xmark" /></button>
-      <div style={{ textAlign: 'center' }}><div style={{ fontWeight: 600 }}>{A.name}</div><div className="sub"><Elapsed start={A.start} /> · {t('{0} sets', done + '/' + total)}</div></div>
+      <div style={{ textAlign: 'center' }}><div style={{ fontWeight: 600 }}>{A.name}</div><div className="sub"><Elapsed start={A.start} /> · {t('{0} sets', done + '/' + total)}{planRir != null && <> · {t('aim RIR {0}', planRir)}</>}</div></div>
       <button className="iconbtn" style={{ color: 'var(--acc)' }} aria-label={t('Finish')} onClick={finishWorkout}><Icon name="check" /></button>
     </div>
     <div className="wprog"><i style={{ width: (total ? done / total * 100 : 0) + '%' }} /></div>
@@ -274,12 +290,12 @@ function ActiveWorkout() {
           <div className="ss-hd"><Icon name="link" />{t('Superset · do these back-to-back, rest after both')}</div>
           {unit.map((idx, k) => <div key={idx} className="ss-ex">
             {k > 0 && <div className="ss-amp">+</div>}
-            <ExerciseBlock entryIdx={idx} compact
+            <ExerciseBlock entryIdx={idx} compact planRir={planRir}
               onToggle={i => toggle(idx, i)} onField={(i, f, v) => setField(idx, i, f, v)} onAddSet={() => addSet(idx)} onRemoveSet={() => removeSet(idx)} onStartTimed={i => startTimed(idx, i)} />
           </div>)}
         </div>
       ) : (
-        <ExerciseBlock entryIdx={cur} onToggle={i => toggle(cur, i)} onField={(i, f, v) => setField(cur, i, f, v)} onAddSet={() => addSet(cur)} onRemoveSet={() => removeSet(cur)} onStartTimed={i => startTimed(cur, i)} />
+        <ExerciseBlock entryIdx={cur} planRir={planRir} onToggle={i => toggle(cur, i)} onField={(i, f, v) => setField(cur, i, f, v)} onAddSet={() => addSet(cur)} onRemoveSet={() => removeSet(cur)} onStartTimed={i => startTimed(cur, i)} />
       )}
     </> : <div className="empty"><div className="ico"><Icon name="shuffle" /></div>{t('Freestyle workout — add your first exercise.')}</div>}
 
@@ -292,7 +308,7 @@ function ActiveWorkout() {
     <Button onClick={() => exercisePicker(ex => exConfigSheet(ex, null, cfg => update(s => {
       const full = { ...cfg, id: ex.id }
       const plan = nextPrescription(s, full, s.routines.find(r => r.id === s.active.routineId))
-      s.active.entries.push({ id: ex.id, target: { ...cfg }, plan, sets: applyPrescription(buildSets(s, full), plan) })
+      s.active.entries.push({ id: ex.id, target: { ...cfg, ...(plan.kind === 'easy' ? { easy: true } : {}) }, plan, sets: applyPrescription(buildSets(s, full), plan) })
       s.active.cur = s.active.entries.length - 1
     }), null, S.routines.find(r => r.id === A.routineId)))} icon="plus">{t('Add exercise')}</Button>
     <div style={{ height: 10 }} />

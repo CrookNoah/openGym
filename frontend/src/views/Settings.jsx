@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, DEF, hasData } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
-import { ACCENTS, todayISO, localTZ } from '../lib/format.js'
+import { ACCENTS, todayISO, localTZ, isoOf, fmtDate } from '../lib/format.js'
 import { effortOf } from '../lib/history.js'
+import { easyWeekActive } from '../lib/progression.js'
 import { api, webauthnOK, passkeyLogin, passkeyRegister, IS_ANDROID } from '../lib/api.js'
 import { pushSupported, enablePush, disablePush, sendTestPush } from '../lib/push.js'
 import { wakeLockSupported } from '../lib/wakelock.js'
@@ -202,6 +203,17 @@ export default function Settings() {
     <Section title={t('Data')}>
       <Row icon="sparkles" iconTint="var(--acc)" title={t('Build me a plan')} subtitle={t('Answer a few questions and openGym designs the week')} accessory="chevron" onClick={planWizardSheet} />
       <Row icon="clipboard" iconTint="var(--blue)" title={t('Load a ready-made plan')} accessory="chevron" onClick={loadStarterPlan} />
+      <Row icon="moon" iconTint="var(--indigo)" title={t('Take an easy week')}
+        subtitle={easyWeekActive(S) ? t('On until {0} — everything is prescribed lighter. Tap to end it now.', fmtDate(S.easyUntil)) : t('Everything at ~60% for a week. Hard training only works with breaks in it.')}
+        onClick={() => {
+          if (easyWeekActive(S)) { update(s => { s.easyUntil = null }); toast(t('Easy week ended — normal targets are back')) }
+          else confirmSheet({
+            title: t('Take an easy week?'),
+            message: t('For the next 7 days every session is prescribed at about 60% — same movements, same weights, fewer reps. The engine skips these sessions when it judges progress, so resting never reads as failing.'),
+            confirmText: t('Start easy week'),
+            onConfirm: () => { update(s => { const d = new Date(); d.setDate(d.getDate() + 6); s.easyUntil = isoOf(d) }); toast(t('Easy week on — it ends after {0}', fmtDate(isoOf(new Date(Date.now() + 6 * 86400000))))) },
+          })
+        }} />
       <Row icon="shuffle" iconTint="var(--teal)" title={t('Import from another app')}
         subtitle={t('FitNotes, Strong, Hevy — or body weight from Apple Health')}
         accessory="chevron" onClick={() => importRef.current.click()} />

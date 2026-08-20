@@ -1075,7 +1075,9 @@ export function beginWorkout(routineId, bw) {
   // kept on the entry purely so the workout can explain the number it chose.
   const entries = (r ? r.ex : []).map(cfg => {
     const plan = nextPrescription(st, cfg, r)
-    return { id: cfg.id, sg: cfg.sg, target: { ...cfg }, plan, sets: applyPrescription(buildSets(st, cfg), plan) }
+    // An easy-week session is stamped as one, so the progression engine can skip it when it
+    // reads the history back — resting must never score as a miss.
+    return { id: cfg.id, sg: cfg.sg, target: { ...cfg, ...(plan.kind === 'easy' ? { easy: true } : {}) }, plan, sets: applyPrescription(buildSets(st, cfg), plan) }
   })
   update(s => {
     s.active = { id: uid(), d: todayISO(), start: Date.now(), routineId, name: r ? r.name : t('Freestyle'), bw: bw || null, cur: 0, entries }

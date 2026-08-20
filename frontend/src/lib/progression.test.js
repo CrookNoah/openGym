@@ -573,3 +573,57 @@ describe('variation ladders', () => {
     expect(p.nextId).toBeUndefined()
   })
 })
+
+/* ---- a deliberately easy week (S.easyUntil) ---- */
+describe('easy week', () => {
+  const FUTURE = '2099-01-01'
+  const PAST = '2000-01-01'
+  const easy = extra => ({ ...hist(LIFT, [[60, 5, 5, 5]]), ...extra })
+
+  it('prescribes about 60% of the reps and keeps the weight on the bar', () => {
+    const p = nextPrescription(easy({ easyUntil: FUTURE }), { id: LIFT, sets: 3, reps: 5, prog: 'linear' })
+    expect(p.kind).toBe('easy')
+    expect(p.weight).toBe(60)
+    expect(p.reps).toBe(3)
+  })
+
+  it('cuts a hold to about 60% of its duration', () => {
+    const S = {
+      unit: 'kg', easyUntil: FUTURE,
+      workouts: [{ d: '2026-02-01', entries: [{ id: LIFT, target: { sets: 2, sec: 50, mode: 'time' }, sets: [{ sec: 50, w: 0, done: true }, { sec: 50, w: 0, done: true }] }] }],
+    }
+    const p = nextPrescription(S, { id: LIFT, mode: 'time', sets: 2, sec: 50, prog: 'time' })
+    expect(p.kind).toBe('easy')
+    expect(p.sec).toBe(30)
+  })
+
+  it('steps a unilateral easy target in twos, like every other rep target', () => {
+    const S = { unit: 'kg', easyUntil: FUTURE, workouts: [{ d: '2026-02-01', entries: [{ id: LIFT, target: { sets: 3, reps: 16, side: true }, sets: [{ w: 0, r: 16, done: true }] }] }] }
+    const p = nextPrescription(S, { id: LIFT, sets: 3, reps: 16, side: true, weight: 0, prog: 'linear' })
+    expect(p.kind).toBe('easy')
+    expect(p.reps % 2).toBe(0)
+  })
+
+  it('is over when the date has passed', () => {
+    const p = nextPrescription(easy({ easyUntil: PAST }), { id: LIFT, sets: 3, reps: 5, prog: 'linear' })
+    expect(p.kind).not.toBe('easy')
+  })
+
+  it('never fires before there is a baseline to be easy against', () => {
+    const p = nextPrescription({ unit: 'kg', easyUntil: FUTURE, workouts: [] }, { id: LIFT, sets: 3, reps: 5, prog: 'linear' })
+    expect(p.kind).toBe('first')
+  })
+
+  it('skips easy-marked sessions when reading history back', () => {
+    // Three clean weeks, then an easy week trained at 60%. The week after must judge
+    // against the last NORMAL session — resting is neither a hit nor a miss.
+    const S = hist(LIFT, [[60, 5, 5, 5]])
+    S.workouts.push({
+      d: '2026-01-09',
+      entries: [{ id: LIFT, target: { sets: 3, reps: 3, easy: true }, sets: [{ w: 60, r: 3, done: true }, { w: 60, r: 3, done: true }, { w: 60, r: 3, done: true }] }],
+    })
+    const p = nextPrescription(S, { id: LIFT, sets: 3, reps: 5, prog: 'linear' })
+    expect(p.kind).toBe('up')          // judged off the clean 60×5s, not the easy 60×3s
+    expect(p.weight).toBeGreaterThan(60)
+  })
+})
