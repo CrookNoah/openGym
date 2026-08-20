@@ -182,7 +182,8 @@ stays a one-command `docker compose up`.
 The training logic — progression rules, 1RM estimation, how a logged session is read back —
 lives in pure functions under `frontend/src/lib/` with tests next to them: `npm test` in
 `frontend/`. Vitest is a dev dependency; the app itself ships no runtime dependencies beyond
-React, the router and Zustand.
+React, the router and Zustand — plus `@anthropic-ai/sdk`, which is code-split and only ever
+downloaded by someone who switches on AI food estimates and supplies their own API key.
 
 ## Community
 

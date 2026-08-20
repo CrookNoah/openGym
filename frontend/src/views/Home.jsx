@@ -5,6 +5,8 @@ import { effectiveRoutine, effectiveRoutineId, streakWeeks, lastBW, setsDoneActi
 import { fmtNum, fmtDate, todayISO, isoOf, weekKey, DAYS } from '../lib/format.js'
 import { t, dateLocale } from '../lib/i18n.js'
 import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, loadStarterPlan, bwDeltaColor } from '../sheets.jsx'
+import { addFoodSheet } from '../foodsheets.jsx'
+import { dayTotals, targetOf, MACROS, MACRO_NAME } from '../lib/food.js'
 import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
@@ -114,6 +116,31 @@ export default function Home() {
         )}
         <div className="chart" style={{ marginTop: 8 }}><LineChart points={bwPoints} h={130} unit={S.unit} goal={S.targetW} /></div>
       </> : <div className="muted small">{t("No entries yet — log your weight to start the curve. It's also asked before every workout.")}</div>}
+    </div>
+
+    <div className="card tappable" style={{ cursor: 'pointer' }} onClick={() => nav('/food')}>
+      <div className="row between" style={{ marginBottom: 6 }}>
+        <h2 style={{ margin: 0 }}>{t('Food')}</h2>
+        <Button size="sm" icon="plus" onClick={ev => { ev.stopPropagation(); addFoodSheet(todayISO()) }}>{t('Log')}</Button>
+      </div>
+      {(() => {
+        const got = dayTotals(S, todayISO())
+        const tgt = targetOf(S)
+        const any = got.kcal > 0 || MACROS.some(k => got[k] > 0)
+        if (!any) return <div className="muted small">{t('Nothing logged today — tap to start, or set a daily target.')}</div>
+        const over = tgt && tgt.kcal && got.kcal > tgt.kcal
+        return <>
+          <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
+            <div className="big">{got.kcal} <span className="muted" style={{ fontSize: '1rem' }}>kcal</span></div>
+            {tgt && tgt.kcal > 0 && <span className="small" style={{ marginLeft: 'auto', color: over ? 'var(--yellow)' : 'var(--label-2)' }}>
+              {t('of {0}', tgt.kcal)}
+            </span>}
+          </div>
+          <div className="small muted" style={{ marginTop: 4 }}>
+            {MACROS.map(k => `${t(MACRO_NAME[k])} ${fmtNum(got[k])} g`).join(' · ')}
+          </div>
+        </>
+      })()}
     </div>
 
     <div className="card tappable" style={{ cursor: 'pointer' }} onClick={() => calendarSheet()}>

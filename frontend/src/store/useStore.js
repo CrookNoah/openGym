@@ -17,6 +17,11 @@ export const DEF = {
   // What you own (lib/gear.js). null = never chosen = no filtering, which is what every
   // profile written before this field existed has to keep behaving like.
   gear: null,
+  // The food log (lib/food.js), in the same shape as bodyweight: a flat list of dated
+  // entries, synced and exported with everything else. The AI API key is deliberately NOT
+  // here — see lib/foodai.js; a credential has no business in a payload that gets PUT to a
+  // server and written into every backup.
+  food: [], foodTarget: null,
   // effort: which per-set effort scale is logged — 'none' | 'rir' | 'rpe'. null, not 'none', so
   // that a profile which never chose (loaded state is overlaid on DEF, on every path: local,
   // server pull, backup import) still falls back to the `showRir` boolean this replaced and

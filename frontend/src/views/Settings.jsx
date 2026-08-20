@@ -12,8 +12,21 @@ import { DEMO, REPO } from '../lib/demo.js'
 import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp, gearSheet } from '../sheets.jsx'
 import { gearSummary } from '../lib/gear.js'
+import { aiKeySheet, foodTargetSheet } from '../foodsheets.jsx'
+import { hasKey } from '../lib/foodai.js'
+import { targetOf, MACROS, MACRO_NAME } from '../lib/food.js'
 import Icon from '../components/Icon.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
+
+// "1900 kcal · Protein 140 g", or an invitation when nothing is set.
+function foodTargetLabel(S, tr) {
+  const tgt = targetOf(S)
+  if (!tgt) return tr('Not set')
+  const bits = []
+  if (tgt.kcal) bits.push(tgt.kcal + ' kcal')
+  MACROS.forEach(k => { if (tgt[k]) bits.push(`${tr(MACRO_NAME[k])} ${tgt[k]} g`) })
+  return bits.join(' · ')
+}
 
 export default function Settings() {
   const nav = useNavigate()
@@ -119,6 +132,12 @@ export default function Settings() {
     {/* ---------- equipment ---------- */}
     <Section title={t('Equipment')} footer={t('Everything is filtered to this — the exercise library, the starter plans, and the variation each exercise offers you next. Tick something new and openGym says what it unlocks.')}>
       <Row icon="wrench" iconTint="var(--teal)" title={t('What have you got?')} subtitle={gearSummary(S, t)} accessory="chevron" onClick={() => gearSheet()} />
+    </Section>
+
+    {/* ---------- food ---------- */}
+    <Section title={t('Food')} footer={t('AI estimates are the only part of openGym that talks to anyone else’s server, they run on your own API key, and the key is kept out of your synced profile and your backups. Everything else — typing food in, searching the free database — needs no key and sends nothing anywhere.')}>
+      <Row icon="target" iconTint="var(--purple)" title={t('Daily target')} subtitle={foodTargetLabel(S, t)} accessory="chevron" onClick={foodTargetSheet} />
+      <Row icon="sparkles" iconTint="var(--acc)" title={t('AI estimates')} subtitle={hasKey() ? t('On — using your own API key') : t('Off — needs an Anthropic API key')} accessory="chevron" onClick={aiKeySheet} />
     </Section>
 
     {/* ---------- during a workout ---------- */}

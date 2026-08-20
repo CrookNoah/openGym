@@ -69,6 +69,29 @@ never trained.
   the abs row of the muscle map. Corrected by id in `lib/muscles.js`, which already exists to
   normalise the dataset's inconsistent muscle naming.
 
+### A food log, with the AI part strictly optional
+
+Training and eating are the same project, and openGym already knew your body weight — so the
+missing half was what went in. `S.food` sits alongside `S.bodyweight`: a flat list of dated
+entries that syncs, exports and restores with everything else.
+
+- 🍽️ **A day at a time.** Calories and all three macros, each against its own target, with a
+  Food card on Home mirroring how Body weight already reads. No target set? The macro bars show
+  where your energy actually came from instead of being drawn against a number nobody chose.
+- **Three ways in, and the first two need nothing.** Type it off the packet; search
+  **Open Food Facts** (open data, no key, no account, no quota); or describe/photograph it and
+  let a model estimate. The app is fully usable if you never touch the third.
+- 🔒 **The API key is deliberately not part of your profile.** Everything in `S` is PUT to your
+  server on every change and written into every JSON backup — a credential has no business in
+  that payload. It lives in its own on-device slot and leaves in exactly one direction.
+- **An estimate never dresses as a measurement.** Every entry records where its numbers came
+  from; AI entries are flagged in the log, arrive as an editable list you approve item by item,
+  and mark any portion the model inferred rather than saw. Naming what is on a plate is
+  something a model does well — judging its mass from a flat photo is mostly inference.
+- **The SDK is code-split**, so the 162 kB of it is downloaded by people who enable AI and
+  nobody else. Protein targets can be suggested from body weight at 1.6 g/kg — offered, never
+  applied, because openGym has no idea what you are training for.
+
 ### Equipment that changes the plan, not just the library
 
 Ticking a pull-up bar used to do one thing: widen the exercise library. That is the smaller
