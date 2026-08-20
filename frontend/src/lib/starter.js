@@ -116,7 +116,7 @@ export const STARTER_PLANS = [
     name: 'Push / Pull / Legs — barbell',
     sub: 'The original openGym starter plan. Needs a gym.',
     note: 'Barbell, dumbbells, cables and machines.',
-    gear: ['gym'],
+    gear: ['barbell', 'dumbbell', 'machines', 'dip'],   // bench press, DB work, cables/levers/sled, chest dips
     days: 'Mon · Wed · Fri',
     week: { 1: 0, 3: 1, 5: 2 },
     routines: PPL_SPEC.map(([name, emoji, list]) => ({ name, emoji, ex: list.map(([id, sets, r]) => load(id, sets, r)) })),

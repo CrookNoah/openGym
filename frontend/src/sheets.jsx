@@ -8,7 +8,7 @@ import { beep, vibrate } from './lib/sound.js'
 import { t, instrFor, getLang, INSTR_LANGS } from './lib/i18n.js'
 import { nav } from './lib/nav.js'
 import { STARTER_PLANS, buildPlan } from './lib/starter.js'
-import { GEAR, GEAR_NAME, gearChosen, hasGear, filterByGear } from './lib/gear.js'
+import { GEAR, GEAR_NAME, gearChosen, hasGear, filterByGear, expandGear } from './lib/gear.js'
 import { ladderPos, isHeldRung, ladderOf } from './lib/ladders.js'
 import { proposeAdditions, applyAdditions } from './lib/kit.js'
 import Media, { Thumb } from './components/Media.jsx'
@@ -53,7 +53,9 @@ export function confirmSheet(opts) {
 // two thirds of its library because a new screen appeared.
 function GearSheet({ onDone, close }) {
   const st = useStore(s => s.S)
-  const [sel, setSel] = useState(() => (gearChosen(st) ? [...st.gear] : []))
+  // Expanded, so a pre-split profile that ticked "Weights and machines" sees the whole
+  // loaded family on — and saving migrates it onto the new keys.
+  const [sel, setSel] = useState(() => (gearChosen(st) ? expandGear(st.gear) : []))
   const toggle = k => setSel(v => (v.includes(k) ? v.filter(x => x !== k) : [...v, k]))
   const save = () => {
     // Work out what the change unlocks *before* writing it, so the offer can be made against

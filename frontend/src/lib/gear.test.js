@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { gearOf, hasGear, canDo, filterByGear, gearChosen, gearSummary, GEAR, GEAR_KEYS, FLOOR } from './gear.js'
+import { gearOf, hasGear, canDo, filterByGear, gearChosen, gearSummary, expandGear, GEAR, GEAR_KEYS, FLOOR } from './gear.js'
 import { EXDB, EXIDX } from './exercises.js'
 
 const ex = id => EXIDX[id]
@@ -32,11 +32,27 @@ describe('gearOf', () => {
     expect(gearOf(ex('0808'))).toBe('rings')    // suspended row
   })
 
-  it('sends everything loaded to the gym bucket', () => {
-    expect(gearOf(ex('0025'))).toBe('gym')      // barbell bench press
-    expect(gearOf(ex('0426'))).toBe('gym')      // dumbbell overhead press
-    expect(gearOf(ex('0739'))).toBe('gym')      // sled leg press
-    expect(gearOf(ex('0585'))).toBe('gym')      // lever leg extension
+  it('tells loaded kit apart instead of lumping it into one gym bucket', () => {
+    expect(gearOf(ex('0025'))).toBe('barbell')     // barbell bench press
+    expect(gearOf(ex('0426'))).toBe('dumbbell')    // dumbbell overhead press
+    expect(gearOf(ex('0549'))).toBe('kettlebell')  // kettlebell swing
+    expect(gearOf(ex('0739'))).toBe('machines')    // sled leg press
+    expect(gearOf(ex('0585'))).toBe('machines')    // lever leg extension
+    expect(gearOf(ex('2330'))).toBe('machines')    // cable lat pulldown
+  })
+
+  it('reads a dip belt as the load it is, not as a gym', () => {
+    expect(gearOf(ex('2135'))).toBe('vest')        // weighted front plank
+  })
+
+  it('keeps a pre-split gym profile owning the whole loaded family', () => {
+    const legacy = { gear: ['gym'] }
+    expect(hasGear(legacy, 'dumbbell')).toBe(true)
+    expect(hasGear(legacy, 'barbell')).toBe(true)
+    expect(hasGear(legacy, 'machines')).toBe(true)
+    expect(hasGear(legacy, 'bar')).toBe(false)     // gym never implied a home pull-up bar
+    expect(expandGear(['gym', 'bar']).sort()).toEqual(['bar', 'barbell', 'dumbbell', 'kettlebell', 'machines', 'vest'])
+    expect(expandGear(['bar'])).toEqual(['bar'])
   })
 
   it('reads bands as bands', () => {
@@ -65,14 +81,14 @@ describe('hasGear', () => {
   })
 
   it('gives a profile that never chose the whole library', () => {
-    expect(hasGear(UNSET, 'gym')).toBe(true)
+    expect(hasGear(UNSET, 'machines')).toBe(true)
     expect(hasGear(UNSET, 'bar')).toBe(true)
     expect(gearChosen(UNSET)).toBe(false)
   })
 
   it('holds a floor-only profile to the floor', () => {
     expect(hasGear(FLOOR_ONLY, 'bar')).toBe(false)
-    expect(hasGear(FLOOR_ONLY, 'gym')).toBe(false)
+    expect(hasGear(FLOOR_ONLY, 'barbell')).toBe(false)
     expect(gearChosen(FLOOR_ONLY)).toBe(true)
   })
 
