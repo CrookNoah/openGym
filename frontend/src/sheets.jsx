@@ -9,7 +9,8 @@ import { t, instrFor, getLang, INSTR_LANGS } from './lib/i18n.js'
 import { nav } from './lib/nav.js'
 import { STARTER_PLANS, buildPlan } from './lib/starter.js'
 import { GEAR, GEAR_NAME, gearChosen, hasGear, filterByGear } from './lib/gear.js'
-import { ladderPos, isHeldRung } from './lib/ladders.js'
+import { ladderPos, isHeldRung, ladderOf } from './lib/ladders.js'
+import { proposeAdditions, applyAdditions } from './lib/kit.js'
 import Media, { Thumb } from './components/Media.jsx'
 import Stepper from './components/Stepper.jsx'
 import Icon from './components/Icon.jsx'
@@ -53,9 +54,16 @@ function GearSheet({ onDone, close }) {
   const [sel, setSel] = useState(() => (gearChosen(st) ? [...st.gear] : []))
   const toggle = k => setSel(v => (v.includes(k) ? v.filter(x => x !== k) : [...v, k]))
   const save = () => {
+    // Work out what the change unlocks *before* writing it, so the offer can be made against
+    // the plan as it stands rather than one the save has already moved on from.
+    const before = gearChosen(st) ? st.gear : []
+    const picks = proposeAdditions(st, before, sel, ladderOf)
     update(s => { s.gear = sel })
     close()
     toast(sel.length ? t('Kit saved') : t('Floor only — the library is filtered to match'))
+    // A new pattern is the part of a kit change that a filtered library cannot deliver on its
+    // own: until it is in a routine, it is not being trained.
+    if (picks.length) kitUnlockSheet(picks)
     onDone && onDone()
   }
   return <>
@@ -79,11 +87,49 @@ function GearSheet({ onDone, close }) {
 }
 export const gearSheet = (onDone) => ui().openSheet(close => <GearSheet onDone={onDone} close={close} />)
 
+// What the new kit makes possible, offered rather than applied. Each row is one movement
+// pattern that was unreachable a moment ago, with the easiest rung of it and the day it
+// would join — buying a bar does not make you able to do a one-arm chin-up.
+function KitUnlock({ picks, close }) {
+  const [on, setOn] = useState(() => picks.map(() => true))
+  const chosen = picks.filter((_, i) => on[i])
+  const add = () => {
+    update(s => applyAdditions(s, chosen))
+    close()
+    toast(t(chosen.length === 1 ? '{0} added to {1}' : '{0} exercises added', chosen[0].name, chosen[0].routineName))
+    nav('/plan')
+  }
+  return <>
+    <h3 className="row" style={{ gap: 8 }}><Icon name="sparkles" style={{ color: 'var(--acc)' }} />{t('That unlocks something')}</h3>
+    <div className="muted small" style={{ marginBottom: 14, lineHeight: 1.5 }}>
+      {t(picks.length === 1
+        ? 'Your new kit trains a movement your plan has no way to do yet. Add it?'
+        : 'Your new kit trains {0} movements your plan has no way to do yet. Add them?', picks.length)}
+    </div>
+    <div className="sect-b" style={{ marginBottom: 12 }}>
+      {picks.map((p, i) => <Row key={p.id} icon="figureStrength" iconTint="var(--acc)"
+        title={t(p.ladderName) + ' · ' + p.name}
+        subtitle={t('Starts at {0} — joins {1}', p.cfg.sec ? fmtSec(p.cfg.sec) : t('{0} × {1}', p.cfg.sets, p.cfg.reps), p.routineName)}>
+        <Switch checked={on[i]} onChange={v => setOn(x => x.map((y, j) => (j === i ? v : y)))} />
+      </Row>)}
+    </div>
+    <div className="small dim" style={{ marginBottom: 14, lineHeight: 1.4 }}>
+      {t('Each one starts on its easiest rung. Once you outgrow it, openGym offers the next variation up as usual.')}
+    </div>
+    <Button variant="primary" icon="plus" disabled={!chosen.length} onClick={add}>
+      {chosen.length ? t(chosen.length === 1 ? 'Add it to my plan' : 'Add {0} to my plan', chosen.length) : t('Nothing selected')}
+    </Button>
+    <div style={{ height: 8 }} />
+    <Button variant="ghost" className="dim" onClick={close}>{t('Not now')}</Button>
+  </>
+}
+export const kitUnlockSheet = picks => ui().openSheet(close => <KitUnlock picks={picks} close={close} />)
+
 /* ============================ starter plan ============================ */
 function StarterPlans({ close }) {
   const st = useStore(s => s.S)
   const pick = plan => {
-    const { routines, week } = buildPlan(plan)
+    const { routines, week } = buildPlan(plan, st)
     update(s => {
       s.routines.push(...routines)
       Object.entries(week).forEach(([d, id]) => { s.week[d] = id })

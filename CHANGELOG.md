@@ -69,6 +69,24 @@ never trained.
   the abs row of the muscle map. Corrected by id in `lib/muscles.js`, which already exists to
   normalise the dataset's inconsistent muscle naming.
 
+### Equipment that changes the plan, not just the library
+
+Ticking a pull-up bar used to do one thing: widen the exercise library. That is the smaller
+half of the answer — a bar unlocks *vertical pulling*, a movement pattern a floor cannot train
+at all, and until it is in a routine it is still not being trained.
+
+- 🔧 **Equipment is its own section in Settings** rather than a row buried under Data.
+- ✨ **Ticking new kit says what it unlocks.** openGym works out which movement patterns just
+  became reachable, picks the easiest rung of each, and offers to add it to the day that
+  already trains that half of the body — pulling joins your upper day, not leg day. Each
+  suggestion is a switch you can decline; nothing is added without you saying so.
+- **It offers the easiest rung on purpose.** Buying a bar does not make you able to do a
+  one-arm chin-up, and a first session you cannot finish is the fastest way to stop using the
+  new equipment. From there the normal ladder takes over.
+- 🏋️ **Starter plans adapt to your kit as they load.** The Upper/Lower/Full plan now folds real
+  vertical pulling into its upper day the moment you have a bar, instead of handing a bar owner
+  a plan built around the absence of one.
+
 ### Pounds, and numbers that are counted rather than derived
 
 - ⚖️ **A fresh profile starts in lb.** Only a fresh one: a profile that already chose kg keeps

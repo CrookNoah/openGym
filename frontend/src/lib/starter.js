@@ -7,6 +7,7 @@
 // and it was the first thing a new profile was offered. So plans now come as a list, each
 // declaring the kit it needs (lib/gear.js), and the chooser only offers what you can train.
 import { uid } from './format.js'
+import { hasGear } from './gear.js'
 
 // [id, sets, reps, repsMax] — repsMax is the top of the range, after which the bodyweight
 // policy adds a set instead of a rep, and eventually offers the next rung of the ladder.
@@ -86,7 +87,11 @@ export const STARTER_PLANS = [
         reps('0815', 3, 10, 20),   // triceps dips floor
         reps('3021', 3, 12, 20),   // scapula push-up — serratus and traps, otherwise skipped
         hold('3665', 3, 45, 90),   // power point plank — anti-extension core
-      ] },
+      ],
+      // Vertical pulling is the one pattern a floor cannot give you at all. With a bar it
+      // is the most valuable thing in the session, so it goes in rather than being left
+      // for the kit-unlock prompt to offer later.
+      gearEx: { bar: [reps('1326', 3, 5, 10)] } },
       { name: 'Lower', emoji: 'legs', ex: [
         reps('3119', 4, 15, 25),   // potty squat
         reps('0696', 3, 6, 12),    // self assisted inverse leg curl — the only real hamstring
@@ -120,9 +125,21 @@ export const STARTER_PLANS = [
 
 export const planByKey = key => STARTER_PLANS.find(p => p.key === key) || null
 
-/** Fresh routines for one plan, plus the weekday → routine-id map that goes with them. */
-export function buildPlan(plan) {
-  const routines = plan.routines.map(r => ({ id: uid(), name: r.name, emoji: r.emoji, ex: r.ex.map(e => ({ ...e })) }))
+/**
+ * Fresh routines for one plan, plus the weekday → routine-id map that goes with them.
+ *
+ * `S` is optional and only decides the kit-gated extras: a routine may list exercises under
+ * `gearEx`, keyed by the equipment they need, and they are folded in only for someone who
+ * has it. That way one plan covers a bare floor and a floor with a pull-up bar, instead of
+ * the bar owner loading a plan built around its absence.
+ */
+export function buildPlan(plan, S) {
+  const routines = plan.routines.map(r => {
+    const extra = Object.entries(r.gearEx || {})
+      .filter(([k]) => hasGear(S || {}, k))
+      .flatMap(([, list]) => list)
+    return { id: uid(), name: r.name, emoji: r.emoji, ex: [...r.ex, ...extra].map(e => ({ ...e })) }
+  })
   const week = {}
   Object.entries(plan.week).forEach(([d, i]) => { if (routines[i]) week[d] = routines[i].id })
   return { routines, week }

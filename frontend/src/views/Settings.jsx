@@ -116,6 +116,11 @@ export default function Settings() {
       </Row>
     </Section>
 
+    {/* ---------- equipment ---------- */}
+    <Section title={t('Equipment')} footer={t('Everything is filtered to this — the exercise library, the starter plans, and the variation each exercise offers you next. Tick something new and openGym says what it unlocks.')}>
+      <Row icon="wrench" iconTint="var(--teal)" title={t('What have you got?')} subtitle={gearSummary(S, t)} accessory="chevron" onClick={() => gearSheet()} />
+    </Section>
+
     {/* ---------- during a workout ---------- */}
     <Section title={t('During a workout')} footer={wakeOK ? t('The screen stays on while a workout is running, so you don’t have to unlock your phone between sets.') : null}>
       <SelectRow icon="timer" iconTint="var(--orange)" title={t('Rest timer')}
@@ -175,7 +180,6 @@ export default function Settings() {
 
     {/* ---------- data: fill it, bring things over, back it up, wipe it ---------- */}
     <Section title={t('Data')}>
-      <Row icon="wrench" iconTint="var(--teal)" title={t('What have you got?')} subtitle={gearSummary(S, t)} accessory="chevron" onClick={() => gearSheet()} />
       <Row icon="sparkles" iconTint="var(--acc)" title={t('Load a starter plan')} accessory="chevron" onClick={loadStarterPlan} />
       <Row icon="shuffle" iconTint="var(--teal)" title={t('Import from another app')}
         subtitle={t('FitNotes, Strong, Hevy — or body weight from Apple Health')}
