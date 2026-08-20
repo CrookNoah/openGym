@@ -336,3 +336,175 @@ describe('applyPlan', () => {
     expect(Object.values(s.week)).not.toContain('old')
   })
 })
+
+/* ---- planner v2: loaded lifts, history, schedule, supersets, finisher ---- */
+import { chooseDays, loadedFor, historyRungFor, patternKeyOf, LOADED } from './planner.js'
+import { supersetUnits } from './history.js'
+import { gearOf } from './gear.js'
+
+describe('loaded lifts', () => {
+  it('is built entirely from ids that resolve, each needing exactly the kit it claims', () => {
+    Object.entries(LOADED).forEach(([pattern, list]) => list.forEach(o => {
+      expect(EXIDX[o.id], `${pattern}: unknown id ${o.id}`).toBeTruthy()
+      // The primary kit the classifier reads off the exercise must be among the declared
+      // needs — otherwise the plan could prescribe a lift the library filter then hides.
+      expect(o.needs, `${pattern}/${EXIDX[o.id].n}`).toContain(gearOf(EXIDX[o.id]))
+    }))
+  })
+
+  it('gives a barbell owner the barbell lift and a floor nothing', () => {
+    expect(loadedFor({ gear: ['barbell', 'bench'] }, 'push')).toBe('0025')
+    expect(loadedFor({ gear: ['dumbbell', 'bench'] }, 'push')).toBe('0289')
+    expect(loadedFor(FLOOR, 'push')).toBe(null)
+  })
+
+  it('knows a bench press needs the bench as well as the bar', () => {
+    expect(loadedFor({ gear: ['barbell'] }, 'push')).toBe(null)
+    expect(loadedFor({ gear: ['barbell'] }, 'squat')).toBe('0043')   // a squat needs no bench
+  })
+
+  it('prefers real dips and real pull-ups over their cable stand-ins', () => {
+    expect(loadedFor({ gear: ['machines', 'dip', 'bar'] }, 'dip')).toBe(null)
+    expect(loadedFor({ gear: ['machines', 'dip', 'bar'] }, 'pull')).toBe(null)
+    expect(loadedFor({ gear: ['machines'] }, 'pull')).toBe('2330')
+  })
+
+  it('puts loaded lifts into the generated plan, with the goal rep range and no ceiling', () => {
+    const { routines, report } = generatePlan({ gear: ['dumbbell', 'bench'] }, A({ days: 3 }))
+    expect(report.loadedCount).toBeGreaterThan(5)
+    const bench = routines.flatMap(r => r.ex).find(e => e.id === '0289')
+    expect(bench).toBeTruthy()
+    expect(bench.reps).toBe(GOALS[0].reps[0])
+    expect(bench.repsMax).toBeUndefined()   // plates are the ladder; no rep ceiling needed
+  })
+
+  it('covers everything trainable for a dumbbell-and-bench home setup', () => {
+    const r = generatePlan({ gear: ['dumbbell', 'bench'] }, A({ days: 3 })).report
+    expect(r.gapNames).toEqual([])
+    // Dumbbells make traps trainable (shrugs) — only shins should remain out of reach.
+    expect(r.untrainableNames).toEqual(['Shins'])
+  })
+
+  it('makes a machines-only profile pull with the lat pulldown, not nothing', () => {
+    const ids = generatePlan({ gear: ['machines'] }, A({ days: 6 })).routines.flatMap(r => r.ex.map(e => e.id))
+    expect(ids).toContain('2330')
+  })
+})
+
+describe('history-aware difficulty', () => {
+  const recent = (id, daysAgo = 8) => ({
+    gear: [],
+    workouts: [{
+      id: 'w', d: '2026-08-10', start: Date.now() - daysAgo * 86400000,
+      entries: [{ id, sets: [{ w: 0, r: 6, done: true }], target: { sets: 3, reps: 6 } }],
+    }],
+  })
+
+  it('starts a pattern at the hardest rung actually performed recently', () => {
+    // The questionnaire says "new to this", the log says archer push-ups. The log wins.
+    const S = recent('3294')
+    expect(historyRungFor(S, 'push')).toBe('3294')
+    const ids = generatePlan(S, A({ level: 'new', days: 3 })).routines.flatMap(r => r.ex.map(e => e.id))
+    expect(ids).toContain('3294')
+    expect(ids).not.toContain('3211')   // and not the kneeling push-up the answer implied
+  })
+
+  it('ignores history older than the window', () => {
+    expect(historyRungFor(recent('3294', 120), 'push')).toBe(null)
+  })
+
+  it('ignores sets that were never checked off', () => {
+    const S = recent('3294')
+    S.workouts[0].entries[0].sets[0].done = false
+    expect(historyRungFor(S, 'push')).toBe(null)
+  })
+
+  it('clamps down to what the current kit reaches', () => {
+    // Pull-up history on a profile that has since said floor-only must not prescribe a bar.
+    expect(historyRungFor(recent('0652'), 'pull')).toBe(null)
+  })
+
+  it('reports how many placements came from history', () => {
+    expect(generatePlan(recent('3294'), A({ level: 'new', days: 3 })).report.fromHistory).toBeGreaterThan(0)
+    expect(generatePlan(FLOOR, A({ days: 3 })).report.fromHistory).toBe(0)
+  })
+})
+
+describe('training on the days you actually have', () => {
+  it('spreads the chosen count as far apart as the available days allow', () => {
+    expect(chooseDays([1, 2, 3, 4, 5], 3)).toEqual([1, 3, 5])
+    expect(chooseDays([5, 6, 0, 1], 2).length).toBe(2)
+  })
+
+  it('uses every available day when there are no spares', () => {
+    expect(chooseDays([0, 6], 2).sort()).toEqual([0, 6])
+    expect(chooseDays([2], 1)).toEqual([2])
+  })
+
+  it('schedules only on the days that were ticked', () => {
+    const { week } = generatePlan(FLOOR, A({ days: 2, availableDays: [2, 3, 5] }))
+    Object.keys(week).forEach(d => expect([2, 3, 5]).toContain(+d))
+  })
+
+  it('drops to the days that exist rather than inventing one', () => {
+    const { week, report } = generatePlan(FLOOR, A({ days: 3, availableDays: [0, 6] }))
+    expect(Object.keys(week)).toHaveLength(2)
+    expect(report.daysClamped).toBe(true)
+    expect(report.days).toBe(2)
+  })
+
+  it('ignores nonsense day numbers instead of scheduling day nine', () => {
+    const { week } = generatePlan(FLOOR, A({ days: 2, availableDays: [9, -1, 2, 5] }))
+    Object.keys(week).forEach(d => expect([2, 5]).toContain(+d))
+  })
+})
+
+describe('the fat-loss extras', () => {
+  const lean = () => generatePlan(FLOOR, A({ goal: 'lean', days: 3 }))
+
+  it('pairs a press with a pull as supersets, adjacent and never timed', () => {
+    const { routines, report } = lean()
+    expect(report.supersets).toBeGreaterThan(0)
+    routines.forEach(r => {
+      // Every superset id must group ADJACENT entries — the contract the workout screen
+      // and cleanupSg both rely on.
+      const units = supersetUnits(r.ex)
+      units.filter(u => u.length > 1).forEach(u => {
+        u.forEach(i => expect(r.ex[i].mode).not.toBe('time'))
+        expect(u.length).toBe(2)
+      })
+    })
+  })
+
+  it('ends each session with a conditioning finisher, held for time', () => {
+    const { routines, report } = lean()
+    expect(report.finisher).toBe('burpee')
+    routines.forEach(r => {
+      const fin = r.ex.find(e => e.id === '1160')
+      expect(fin, r.name).toBeTruthy()
+      expect(fin.mode).toBe('time')
+      expect(fin.prog).toBe('time')
+    })
+  })
+
+  it('keeps the finisher out of the coverage arithmetic', () => {
+    // Conditioning trains no mapped muscle; counting it as a movement slot would raise the
+    // coverage bar without adding anything that could meet it.
+    const { routines, week } = lean()
+    const withFin = routines.reduce((n, r) => n + r.ex.length, 0)
+    expect(weekSlotCount(routines, week)).toBe(withFin - routines.length)
+  })
+
+  it('adds neither for the other goals', () => {
+    const r = generatePlan(FLOOR, A({ goal: 'muscle', days: 3 })).report
+    expect(r.supersets).toBe(0)
+    expect(r.finisher).toBe(null)
+  })
+})
+
+describe('the target effort rides on the routine', () => {
+  it('stamps every routine with the RIR the plan was built around', () => {
+    const { routines, report } = generatePlan(FLOOR, A({ intensity: 'hard' }))
+    routines.forEach(r => expect(r.rir).toBe(report.rir))
+  })
+})

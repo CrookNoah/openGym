@@ -67,8 +67,28 @@ function PlanWizard({ close }) {
       <Stepper label={t('Days a week')} value={a.days} step={1} decimal={false}
         onChange={v => set('days', Math.max(MIN_DAYS, Math.min(MAX_DAYS, Math.round(v) || 3)))} />
     </div>
-    <div className="small dim" style={{ marginBottom: 14, lineHeight: 1.4 }}>
+    <div className="small dim" style={{ marginBottom: 12, lineHeight: 1.4 }}>
       {t('{0} days a week gives you a {1} split. openGym picks which days, and which are rest.', a.days, splitName(a.days))}
+    </div>
+
+    {/* Life has a schedule before training does. Ticked days constrain the placement; none
+        ticked means any day works and openGym arranges the week itself. */}
+    <div className="sect-t" style={{ padding: '0 2px 7px' }}>{t('Days you can train')}</div>
+    <div className="chips" style={{ marginBottom: 6 }}>
+      {[1, 2, 3, 4, 5, 6, 0].map(d => {
+        const on = (a.availableDays || []).includes(d)
+        return <button key={d} className={'chip' + (on ? ' on' : '')} onClick={() => {
+          const cur = a.availableDays || []
+          set('availableDays', on ? cur.filter(x => x !== d) : [...cur, d])
+        }}>{t(DAYS[d])}</button>
+      })}
+    </div>
+    <div className="small dim" style={{ marginBottom: 14, lineHeight: 1.4 }}>
+      {(a.availableDays || []).length
+        ? ((a.availableDays || []).length < a.days
+          ? t('Only {0} days ticked — the plan will train those and drop to a {1} split.', a.availableDays.length, splitName(a.availableDays.length))
+          : t('Sessions go on the ticked days, spread as far apart as they allow.'))
+        : t('None ticked — any day works, and openGym spaces the week itself.')}
     </div>
 
     {/* The kit decides which exercises exist at all, so it is worth confirming here rather
@@ -161,9 +181,18 @@ function PlanPreview({ answers, close }) {
       <div className="tile"><div className="l">{t('Sets a week')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{r.totalSets}</div></div>
       <div className="tile"><div className="l">{t('Rest between sets')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{r.restSec}s</div></div>
     </div>
-    <div className="small dim" style={{ margin: '-4px 2px 14px', lineHeight: 1.45 }}>
+    <div className="small dim" style={{ margin: '-4px 2px 10px', lineHeight: 1.45 }}>
       {t('Aim to stop about {0} reps short of failure. Every exercise starts where your experience puts it and climbs from there.', r.rir)}
     </div>
+    {(r.fromHistory > 0 || r.loadedCount > 0 || r.supersets > 0 || r.finisher || r.daysClamped) && (
+      <div className="small dim" style={{ margin: '0 2px 14px', lineHeight: 1.5 }}>
+        {r.fromHistory > 0 && <div><Icon name="history" style={{ fontSize: 12, marginRight: 5 }} />{t('{0} movements start where your training history puts them, not at a questionnaire guess.', r.fromHistory)}</div>}
+        {r.loadedCount > 0 && <div><Icon name="dumbbell" style={{ fontSize: 12, marginRight: 5 }} />{t('{0} lifts use your weights — they progress by load, so they need no rep ceiling.', r.loadedCount)}</div>}
+        {r.supersets > 0 && <div><Icon name="link" style={{ fontSize: 12, marginRight: 5 }} />{t('{0} superset pairs — a press with a pull, back-to-back, because short rests are the point of this goal.', r.supersets)}</div>}
+        {r.finisher && <div><Icon name="flame" style={{ fontSize: 12, marginRight: 5 }} />{t('Each session ends with a {0} finisher for conditioning.', r.finisher)}</div>}
+        {r.daysClamped && <div><Icon name="calendar" style={{ fontSize: 12, marginRight: 5 }} />{t('You ticked fewer days than you asked for — the plan trains the days that exist.')}</div>}
+      </div>
+    )}
 
     <h4 className="sec">{t('The sessions')}</h4>
     <div className="list">

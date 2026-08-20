@@ -17,7 +17,7 @@ import { LADDERS, rungsFor, ladderOf } from './ladders.js'
 import { EXIDX, exOr } from './exercises.js'
 import { PATTERN_GROUP } from './kit.js'
 import { loadOf, MUSCLES, MUSCLE_NAME } from './muscles.js'
-import { canDo } from './gear.js'
+import { canDo, hasGear } from './gear.js'
 import { isHeldRung } from './ladders.js'
 import { uid } from './format.js'
 
@@ -99,8 +99,37 @@ const REST_WHY = {
 
 export const MIN_DAYS = 1
 export const MAX_DAYS = 6
-export const weekShape = days => WEEK_SHAPE[Math.min(MAX_DAYS, Math.max(MIN_DAYS, days || 3))]
-export const restWhy = days => REST_WHY[Math.min(MAX_DAYS, Math.max(MIN_DAYS, days || 3))]
+const clampDays = days => Math.min(MAX_DAYS, Math.max(MIN_DAYS, days || 3))
+export const weekShape = days => WEEK_SHAPE[clampDays(days)]
+export const restWhy = days => REST_WHY[clampDays(days)]
+
+/**
+ * Training days chosen from the days you actually have.
+ *
+ * The fixed arrangements above assume the whole week is available, which for a lot of people
+ * it is not. Given the days you can train, this picks the subset that spreads them furthest
+ * apart — recovery is the constraint, and the week is circular, so Sunday-to-Monday counts as
+ * one day apart, not six. Brute force over at most C(7,k) subsets, because the honest answer
+ * is small enough to just compute.
+ */
+export function chooseDays(available, count) {
+  const days = [...new Set(available)].filter(d => d >= 0 && d <= 6).sort((a, b) => a - b)
+  if (days.length <= count) return days
+  let best = null, bestScore = -1
+  const pick = (start, chosen) => {
+    if (chosen.length === count) {
+      // Score by the smallest circular gap between consecutive training days — the thing a
+      // bad arrangement gets wrong — with the total spread as the tie-break.
+      const gaps = chosen.map((d, i) => (chosen[(i + 1) % count] - d + 7) % 7 || 7)
+      const score = Math.min(...gaps) * 100 + gaps.reduce((a, b) => a + Math.min(b, 3), 0)
+      if (score > bestScore) { bestScore = score; best = [...chosen] }
+      return
+    }
+    for (let i = start; i < days.length; i++) pick(i + 1, [...chosen, days[i]])
+  }
+  pick(0, [])
+  return best || days.slice(0, count)
+}
 
 /* ============================ the splits ============================ */
 
@@ -138,6 +167,68 @@ export const splitName = days => {
 
 /* ============================ picking the exercise ============================ */
 
+// The loaded lift for each pattern, once the kit exists — barbell first, then dumbbell,
+// kettlebell, machines. A generator on a calisthenics codebase still has to take a ticked
+// barbell seriously: somebody who owns one did not tick it to be prescribed wall push-ups.
+// Every entry lists ALL the kit it needs — a bench press needs the bench as well as the bar.
+// `unless` skips the loaded option when better bodyweight kit exists: with dip bars, chest
+// dips beat a cable pushdown.
+export const LOADED = {
+  push: [
+    { id: '0025', needs: ['barbell', 'bench'] },     // barbell bench press
+    { id: '0289', needs: ['dumbbell', 'bench'] },    // dumbbell bench press
+    { id: '0577', needs: ['machines'] },             // lever chest press
+  ],
+  vpush: [
+    { id: '0091', needs: ['barbell', 'bench'] },     // barbell seated overhead press
+    { id: '0426', needs: ['dumbbell'] },             // dumbbell standing overhead press
+    { id: '0603', needs: ['machines'] },             // lever shoulder press
+  ],
+  row: [
+    { id: '0027', needs: ['barbell'] },              // barbell bent over row
+    { id: '0293', needs: ['dumbbell'] },             // dumbbell bent over row
+    { id: '0541', needs: ['kettlebell'] },           // kettlebell one arm row
+    { id: '1350', needs: ['machines'] },             // lever seated row
+  ],
+  pull: [
+    { id: '2330', needs: ['machines'], unless: 'bar' },  // lat pulldown — a real bar beats it
+  ],
+  squat: [
+    { id: '0043', needs: ['barbell'] },              // barbell full squat
+    { id: '1760', needs: ['dumbbell'] },             // dumbbell goblet squat
+    { id: '0534', needs: ['kettlebell'] },           // kettlebell goblet squat
+    { id: '0739', needs: ['machines'] },             // sled 45° leg press
+  ],
+  hinge: [
+    { id: '0085', needs: ['barbell'] },              // barbell romanian deadlift
+    { id: '1459', needs: ['dumbbell'] },             // dumbbell romanian deadlift
+    { id: '0549', needs: ['kettlebell'] },           // kettlebell swing
+  ],
+  calf: [
+    { id: '0417', needs: ['dumbbell'] },             // dumbbell standing calf raise
+    { id: '0108', needs: ['barbell'] },              // barbell standing leg calf raise
+    { id: '0605', needs: ['machines'] },             // lever standing calf raise
+  ],
+  dip: [
+    { id: '0241', needs: ['machines'], unless: 'dip' },  // cable pushdown — dip bars beat it
+  ],
+}
+
+/** The loaded lift this profile should use for a pattern, or null to stay on the ladder. */
+export function loadedFor(S, pattern) {
+  const opts = LOADED[pattern] || []
+  for (const o of opts) {
+    if (o.unless && hasGear(S, o.unless)) continue
+    if (o.needs.every(k => hasGear(S, k)) && EXIDX[o.id]) return o.id
+  }
+  return null
+}
+// pattern for a loaded id — the ladders don't know these ids, so the superset pairing needs
+// its own lookup.
+const LOADED_PATTERN = {}
+Object.entries(LOADED).forEach(([k, list]) => list.forEach(o => { LOADED_PATTERN[o.id] = k }))
+export const patternKeyOf = id => LOADED_PATTERN[id] || (ladderOf(id) ? ladderOf(id).ladder.key : null)
+
 /**
  * Which rung of a ladder to start on: experience, nudged by goal.
  *
@@ -148,9 +239,39 @@ export const splitName = days => {
 export function pickRung(S, pattern, answers) {
   const rungs = rungsFor(S, pattern)
   if (!rungs.length) return null
+  // Ninety days of actual training outranks a questionnaire answer. The highest rung you
+  // have really performed is where the plan starts — level and goal only speak when the
+  // history has nothing to say about this pattern.
+  const hist = historyRungFor(S, pattern)
+  if (hist) return hist
   const frac = levelOf(answers).rung + goalOf(answers).rungBias
   const i = Math.round(Math.max(0, Math.min(1, frac)) * (rungs.length - 1))
   return rungs[i]
+}
+
+const HISTORY_WINDOW_DAYS = 90
+
+/** The hardest rung of a ladder with a genuinely logged set in the last 90 days, if any. */
+export function historyRungFor(S, pattern) {
+  const ladder = LADDERS.find(l => l.key === pattern)
+  if (!ladder) return null
+  const cutoff = Date.now() - HISTORY_WINDOW_DAYS * 86400000
+  let best = -1
+  ;((S && S.workouts) || []).forEach(w => {
+    const t = w.start || new Date(w.d + 'T12:00:00').getTime()
+    if (t < cutoff) return
+    ;(w.entries || []).forEach(e => {
+      if (!(e.sets || []).some(x => x.done)) return
+      const i = ladder.rungs.indexOf(e.id)
+      if (i > best) best = i
+    })
+  })
+  if (best < 0) return null
+  // Clamp down to what the current kit reaches — history on rings does not help a profile
+  // that has since said it only has a floor.
+  const reachable = rungsFor(S, pattern)
+  for (let i = best; i >= 0; i--) if (reachable.includes(ladder.rungs[i])) return ladder.rungs[i]
+  return null
 }
 
 // Sets for one slot. The first movement of a session gets the most, later ones taper — the
@@ -163,6 +284,19 @@ function setsFor(slotIndex, answers) {
 
 /** One configured exercise for one pattern, or null if the kit cannot reach that pattern. */
 export function buildSlot(S, pattern, slotIndex, answers, used) {
+  // A loaded lift takes the slot when the kit exists: it progresses by weight, so it needs
+  // no rep ceiling and no ladder — the plates are the ladder.
+  const loaded = loadedFor(S, pattern)
+  if (loaded && !(used && used.has(loaded))) {
+    const g = goalOf(answers)
+    const lex = EXIDX[loaded]
+    const lside = /one arm|single arm|one leg|single leg/i.test(lex.n || '')
+    return {
+      id: loaded, sets: setsFor(slotIndex, answers), weight: 0, mode: 'reps',
+      reps: lside ? g.reps[0] * 2 : g.reps[0],
+      ...(lside ? { side: true } : {}),
+    }
+  }
   const rungs = rungsFor(S, pattern)
   if (!rungs.length) return null
   const first = pickRung(S, pattern, answers)
@@ -204,9 +338,16 @@ export function buildSlot(S, pattern, slotIndex, answers, used) {
 const ACCESSORIES = [
   { muscle: 'adductors', ids: ['3667', '1775'] },          // side lying hip adduction, side plank hip adduction
   { muscle: 'obliques', ids: ['0705', '0687', '0635'] },   // side bridge, russian twist, oblique crunches
-  { muscle: 'biceps', ids: ['1769', '1770'] },             // side lying biceps curl, leg concentration curl
+  // Loaded options first: a dumbbell curl is strictly better than curling your own leg, and
+  // reachableId silently skips it for anyone without the dumbbell.
+  { muscle: 'biceps', ids: ['0294', '0031', '1769', '1770'] },   // DB curl, BB curl, then the floor improvisations
   { muscle: 'lower-back', ids: ['0489'] },                 // hyperextension
   { muscle: 'serratus', ids: ['3021'] },                   // scapula push-up
+  // Only reachable with kit — on a bare floor these muscles stay in the "cannot train" list
+  // rather than being papered over with wrist circles.
+  { muscle: 'trapezius', ids: ['0406', '0095', '0604'] },  // DB shrug, BB shrug, lever shrug
+  { muscle: 'forearm', ids: ['0401', '0126'] },            // DB wrist curl, BB wrist curl
+  { muscle: 'deltoids', ids: ['0334'] },                   // DB lateral raise — the side delts pressing misses
 ]
 
 // A curated accessory is available when the kit can reach it — the same rule as a ladder rung.
@@ -219,6 +360,7 @@ const reachableId = (S, id) => !!EXIDX[id] && canDo(S, EXIDX[id])
 export function candidatePool(S) {
   const out = []
   LADDERS.forEach(l => rungsFor(S, l.key).forEach(id => out.push(id)))
+  Object.keys(LOADED).forEach(k => { const id = loadedFor(S, k); if (id) out.push(id) })
   ACCESSORIES.forEach(a => a.ids.forEach(id => { if (reachableId(S, id)) out.push(id) }))
   return [...new Set(out)]
 }
@@ -272,7 +414,9 @@ export const trainableMuscles = S => Object.keys(thresholds(S))
 export const weekSlotCount = (routines, week) =>
   Object.values(week || {}).reduce((n, rid) => {
     const r = (routines || []).find(x => x.id === rid)
-    return n + (r ? r.ex.length : 0)
+    // Cardio conditioning blocks are not movement slots: they train no mapped muscle, so
+    // counting them would raise the coverage bar without adding anything that could meet it.
+    return n + (r ? r.ex.filter(e => (EXIDX[e.id] || {}).bp !== 'cardio').length : 0)
   }, 0)
 
 /** Weekly effective sets per muscle for a whole generated week. */
@@ -299,12 +443,23 @@ export function coverageGaps(S, routines, week) {
     .sort((a, b) => (1 - (load[b] || 0) / th[b]) - (1 - (load[a] || 0) / th[a]))
 }
 
-/** Exercises that would most directly close a gap in one muscle, best first. */
-export function fillersFor(S, muscle) {
+/**
+ * Exercises that would most directly close a gap in one muscle, best first.
+ *
+ * Ties on directness break by how close a ladder rung sits to where this profile trains —
+ * a stalled quad gap in a barbell plan should reach for a pistol-squat progression, not send
+ * an experienced lifter back to a supported squat.
+ */
+export function fillersFor(S, muscle, answers) {
+  const at = {}
+  if (answers) LADDERS.forEach(l => {
+    const want = pickRung(S, l.key, answers)
+    l.rungs.forEach((id, i) => { at[id] = Math.abs(i - l.rungs.indexOf(want)) })
+  })
   const scored = candidatePool(S)
-    .map(id => ({ id, w: (loadOf([{ id, sets: 1 }])[muscle] || 0) }))
+    .map(id => ({ id, w: (loadOf([{ id, sets: 1 }])[muscle] || 0), d: at[id] ?? 0 }))
     .filter(x => x.w > 0)
-    .sort((a, b) => b.w - a.w)
+    .sort((a, b) => (b.w - a.w) || (a.d - b.d))
   return scored.map(x => x.id)
 }
 
@@ -371,12 +526,26 @@ function accessoryCfg(S, id, slotIndex, answers) {
  */
 export function generatePlan(S, answersIn) {
   const answers = { ...DEFAULT_ANSWERS, ...(answersIn || {}) }
-  const days = Math.min(MAX_DAYS, Math.max(MIN_DAYS, answers.days || 3))
+  // Days the user can actually train, when they said so. Fewer available days than sessions
+  // asked for is resolved in favour of reality — the plan trains the days that exist.
+  const avail = Array.isArray(answers.availableDays) && answers.availableDays.length
+    ? [...new Set(answers.availableDays)].filter(d => d >= 0 && d <= 6).sort((a, b) => a - b)
+    : null
+  let days = Math.min(MAX_DAYS, Math.max(MIN_DAYS, answers.days || 3))
+  const daysClamped = !!(avail && avail.length < days)
+  if (daysClamped) days = Math.max(MIN_DAYS, avail.length)
   const slotCap = lengthOf(answers).slots
-  const shape = weekShape(days)
+  const shape = avail ? chooseDays(avail, days) : weekShape(days)
   const keys = splitFor(days)
+  const g = goalOf(answers)
+  const inten = intensityOf(answers)
+  const rirTarget = Math.max(0, Math.min(4, g.rir + inten.rirAdj))
+  // A pattern is reachable through its ladder OR through a loaded lift — a machines-only
+  // profile has no pull-up ladder but very much has a lat pulldown.
+  const canTrain = pattern => rungsFor(S, pattern).length > 0 || !!loadedFor(S, pattern)
 
   const seen = {}
+  let usedHistory = 0
   const routines = keys.map(k => {
     const spec = SESSIONS[k]
     seen[k] = (seen[k] || 0) + 1
@@ -387,16 +556,22 @@ export function generatePlan(S, answersIn) {
     const wanted = [...spec.slots, ...spec.slots.map(x => SUBSTITUTE[x]).filter(Boolean)]
     for (const pattern of wanted) {
       if (ex.length >= slotCap) break
-      const target = rungsFor(S, pattern).length ? pattern : SUBSTITUTE[pattern]
-      if (!target) continue
+      const target = canTrain(pattern) ? pattern : SUBSTITUTE[pattern]
+      if (!target || !canTrain(target)) continue
       const cfg = buildSlot(S, target, ex.length, answers, used)
-      if (cfg) { used.add(cfg.id); ex.push(cfg) }
+      if (cfg) {
+        if (historyRungFor(S, target) === cfg.id) usedHistory++
+        used.add(cfg.id); ex.push(cfg)
+      }
     }
     return {
       id: uid(),
       name: seen[k] > 1 ? `${spec.name} ${seen[k]}` : spec.name,
       emoji: spec.emoji,
       prog: 'linear',
+      // The effort the plan was built around, so the workout screen can show the same number
+      // the preview promised instead of the two drifting apart.
+      rir: rirTarget,
       ex,
     }
   })
@@ -405,19 +580,34 @@ export function generatePlan(S, answersIn) {
   shape.forEach((d, i) => { if (routines[i]) week[d] = routines[i].id })
   const trained = () => routines.filter(r => Object.values(week).includes(r.id))
 
+  // ---- the fat-loss extras ----
+  // Short rests are half of that goal's programming; the other half is a finisher and
+  // supersets, both of which the app already supports and a plan should therefore use.
+  let finisher = null
+  if (answers.goal === 'lean' && reachableId(S, '1160')) {
+    finisher = '1160'   // burpees, held for time — the honest floor-only conditioning block
+    trained().forEach(r => {
+      if (!r.ex.some(e => e.id === finisher)) {
+        r.ex.push({ id: finisher, sets: 3, sec: 40, secMax: 75, weight: 0, mode: 'time', prog: 'time' })
+      }
+    })
+  }
+
   // ---- audit and backfill ----
   // The check a person would do by eye on the muscle map, run before you ever see the plan.
   // Loops rather than making one pass: adding a movement changes the numbers, so the only way
   // to know a gap is closed is to measure again. Bounded by the fact that each pass either
   // adds something or gives up on that muscle.
   const filled = []
-  const hardCap = Math.min(9, slotCap + 2)   // accessories may stretch a session, never double it
+  // Accessories may stretch a session, never double it — and a conditioning finisher gives
+  // its slot back, or it would crowd out the accessory that closes a real gap.
+  const hardCap = Math.min(9, slotCap + 2) + (finisher ? 1 : 0)
   for (let pass = 0; pass < 6; pass++) {
     const gaps = coverageGaps(S, routines, week)
     if (!gaps.length) break
     let progressed = false
     for (const muscle of gaps) {
-      const all = fillersFor(S, muscle)
+      const all = fillersFor(S, muscle, answers)
       if (!all.length) continue
       const already = new Set(routines.flatMap(r => r.ex.map(e => e.id)))
       const fresh = all.filter(id => !already.has(id))
@@ -473,16 +663,39 @@ export function generatePlan(S, answersIn) {
   }
   const gaps = coverageGaps(S, routines, week)
 
+  // ---- supersets, for the goal whose rest periods want them ----
+  // Adjacent opposing pairs (a press with a pull) share a superset id, which is exactly the
+  // structure the workout screen already knows how to run back-to-back. Never a timed hold,
+  // never more than two pairs a session, and always adjacent — the sg contract.
+  let supersets = 0
+  if (answers.goal === 'lean') {
+    const PRESS = ['push', 'vpush', 'dip']
+    const PULLS = ['row', 'pull']
+    trained().forEach(r => {
+      let pairs = 0
+      for (let i = 0; i + 1 < r.ex.length && pairs < 2; i++) {
+        const a = r.ex[i], b = r.ex[i + 1]
+        if (a.sg || b.sg || a.mode === 'time' || b.mode === 'time') continue
+        const pa = patternKeyOf(a.id), pb = patternKeyOf(b.id)
+        const opposing = (PRESS.includes(pa) && PULLS.includes(pb)) || (PULLS.includes(pa) && PRESS.includes(pb))
+        if (!opposing) continue
+        const sgId = 'sg' + uid()
+        a.sg = sgId; b.sg = sgId
+        pairs++; supersets++
+      }
+    })
+  }
+
   const load = weeklyLoad(routines, week)
-  const g = goalOf(answers)
-  const inten = intensityOf(answers)
   return {
     routines,
     week,
     report: {
       days,
       splitName: splitName(days),
-      restWhy: restWhy(days),
+      restWhy: avail
+        ? 'Placed on the days you said you can train, spread as far apart as they allow.'
+        : restWhy(days),
       restDays: [0, 1, 2, 3, 4, 5, 6].filter(d => !week[d]),
       load,
       thresholds: thresholds(S, weekSlotCount(routines, week)),
@@ -498,9 +711,16 @@ export function generatePlan(S, answersIn) {
       restSec: g.restSec,
       // RIR is "reps left in the tank" — the app's own effort scale. Lower means closer to
       // failure, so a harder intensity subtracts.
-      rir: Math.max(0, Math.min(4, g.rir + inten.rirAdj)),
+      rir: rirTarget,
       goalName: g.name,
       intensityName: inten.name,
+      // How the week was placed and dressed — everything the preview needs to explain itself.
+      pickedDays: !!avail,
+      daysClamped,
+      fromHistory: usedHistory,
+      loadedCount: routines.reduce((n, r) => n + r.ex.filter(e => !!LOADED_PATTERN[e.id]).length, 0),
+      supersets,
+      finisher: finisher ? exOr(finisher).n : null,
     },
   }
 }
