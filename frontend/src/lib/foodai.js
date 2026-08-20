@@ -25,11 +25,15 @@ const MODEL_STORE = 'gym_ai_model'
 // fraction as much — but that is a call about your money, so it is offered in Settings
 // rather than made on your behalf.
 export const DEFAULT_MODEL = 'claude-opus-5'
+// `adaptive` marks the models that understand adaptive thinking and the effort dial —
+// both are Claude 4.6+ parameters, and Haiku 4.5 rejects each with a 400, so the request
+// only carries them where they are understood.
 export const AI_MODELS = [
-  { id: 'claude-opus-5', name: 'Claude Opus 5', hint: 'Most capable. Roughly 1¢ a photo.' },
-  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', hint: 'A good middle. Cheaper than Opus.' },
-  { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', hint: 'Fastest and cheapest — a fraction of a cent a photo.' },
+  { id: 'claude-opus-5', name: 'Claude Opus 5', hint: 'Most capable. Roughly 1¢ a photo.', adaptive: true },
+  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', hint: 'A good middle. Cheaper than Opus.', adaptive: true },
+  { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', hint: 'Fastest and cheapest — a fraction of a cent a photo.', adaptive: false },
 ]
+const supportsAdaptive = id => (AI_MODELS.find(m => m.id === id) || {}).adaptive !== false
 
 export const getKey = () => { try { return localStorage.getItem(KEY_STORE) || '' } catch { return '' } }
 export const setKey = k => {
@@ -116,7 +120,6 @@ export async function shrinkToBase64(file) {
 
 /* ---------- the call ---------- */
 
-let clientPromise = null
 async function getClient(key) {
   // Imported here, not at module scope, so the SDK is fetched the first time somebody
   // actually uses this and never by anyone who does not.
@@ -150,16 +153,16 @@ export async function estimateMeal({ text, imageBase64, model } = {}) {
   })
 
   const client = await getClient(key)
+  const mdl = model || getModel()
   let res
   try {
     res = await client.messages.create({
-      model: model || getModel(),
+      model: mdl,
       max_tokens: 16000,
       system: SYSTEM,
-      thinking: { type: 'adaptive' },
       // Reading a plate is perception plus recall, not hard reasoning — low effort keeps the
-      // answer as good and the bill markedly smaller.
-      output_config: { effort: 'low' },
+      // answer as good and the bill markedly smaller. Both parameters 400 on Haiku 4.5.
+      ...(supportsAdaptive(mdl) ? { thinking: { type: 'adaptive' }, output_config: { effort: 'low' } } : {}),
       tools: [LOG_FOOD_TOOL],
       messages: [{ role: 'user', content }],
     })

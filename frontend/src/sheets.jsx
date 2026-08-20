@@ -101,7 +101,9 @@ function KitUnlock({ picks, close }) {
   const add = () => {
     update(s => applyAdditions(s, chosen))
     close()
-    toast(t(chosen.length === 1 ? '{0} added to {1}' : '{0} exercises added', chosen[0].name, chosen[0].routineName))
+    toast(chosen.length === 1
+      ? t('{0} added to {1}', chosen[0].name, chosen[0].routineName)
+      : t('{0} exercises added', chosen.length))
     nav('/plan')
   }
   return <>
@@ -271,7 +273,7 @@ function MeasureSheet({ close }) {
     let n = 0
     update(s => { n = addMeasures(s, v) })
     close()
-    toast(t('{0} measurements saved', n))
+    toast(n === 1 ? t('Measurement saved') : t('{0} measurements saved', n))
   }
   return <>
     <h3>{t('Measurements')}</h3>

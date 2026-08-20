@@ -165,26 +165,38 @@ describe('generatePlan', () => {
     expect(new Set(routines.map(r => r.name)).size).toBe(6)
   })
 
-  it('only ever prescribes exercises that exist and that the kit can reach', () => {
+  // The sweeps below each walk all 648 answer combinations. generatePlan is deterministic
+  // (asserted above), so one shared memo keeps that at 648 generations instead of five times
+  // that — and each sweep still carries an explicit timeout, because 648 generations on a
+  // loaded CI runner does not fit vitest's 5-second default.
+  const planCache = new Map()
+  const planFor = ans => {
+    const k = JSON.stringify(ans)
+    if (!planCache.has(k)) planCache.set(k, generatePlan(FLOOR, ans))
+    return planCache.get(k)
+  }
+  const SWEEP = { timeout: 60000 }
+
+  it('only ever prescribes exercises that exist and that the kit can reach', SWEEP, () => {
     everyCombo.forEach(ans => {
-      generatePlan(FLOOR, ans).routines.forEach(r => r.ex.forEach(e => {
+      planFor(ans).routines.forEach(r => r.ex.forEach(e => {
         expect(EXIDX[e.id], `${JSON.stringify(ans)}: unknown id ${e.id}`).toBeTruthy()
         expect(canDo(FLOOR, EXIDX[e.id]), `${EXIDX[e.id].n} needs kit`).toBe(true)
       }))
     })
   })
 
-  it('never repeats an exercise inside one session', () => {
+  it('never repeats an exercise inside one session', SWEEP, () => {
     everyCombo.forEach(ans => {
-      generatePlan(FLOOR, ans).routines.forEach(r => {
+      planFor(ans).routines.forEach(r => {
         expect(new Set(r.ex.map(e => e.id)).size, `${JSON.stringify(ans)}/${r.name}`).toBe(r.ex.length)
       })
     })
   })
 
-  it('never leaves a session too thin to be worth doing', () => {
+  it('never leaves a session too thin to be worth doing', SWEEP, () => {
     everyCombo.forEach(ans => {
-      generatePlan(FLOOR, ans).routines.forEach(r =>
+      planFor(ans).routines.forEach(r =>
         expect(r.ex.length, `${JSON.stringify(ans)}/${r.name}`).toBeGreaterThanOrEqual(3))
     })
   })
@@ -267,9 +279,9 @@ describe('generatePlan', () => {
     expect(pullDay.ex.length).toBeGreaterThanOrEqual(3)
   })
 
-  it('produces configs the progression engine can read from session one', () => {
+  it('produces configs the progression engine can read from session one', SWEEP, () => {
     everyCombo.slice(0, 60).forEach(ans => {
-      const { routines } = generatePlan(FLOOR, ans)
+      const { routines } = planFor(ans)
       routines.forEach(r => r.ex.forEach(cfg => {
         expect(isBw(cfg), EXIDX[cfg.id].n).toBe(true)
         expect(nextPrescription(FLOOR, cfg, r).kind, EXIDX[cfg.id].n).toBe('first')
@@ -280,17 +292,17 @@ describe('generatePlan', () => {
     })
   })
 
-  it('keeps a unilateral target even, so both sides get the rep', () => {
+  it('keeps a unilateral target even, so both sides get the rep', SWEEP, () => {
     everyCombo.forEach(ans => {
-      generatePlan(FLOOR, ans).routines.forEach(r => r.ex.forEach(e => {
+      planFor(ans).routines.forEach(r => r.ex.forEach(e => {
         if (e.side) expect(e.reps % 2, EXIDX[e.id].n).toBe(0)
       }))
     })
   })
 
-  it('gives a timed hold a rule it is allowed to run', () => {
+  it('gives a timed hold a rule it is allowed to run', SWEEP, () => {
     everyCombo.forEach(ans => {
-      generatePlan(FLOOR, ans).routines.forEach(r => r.ex.forEach(e => {
+      planFor(ans).routines.forEach(r => r.ex.forEach(e => {
         if (modeOf(e) === 'time') expect(e.prog, EXIDX[e.id].n).toBe('time')
       }))
     })

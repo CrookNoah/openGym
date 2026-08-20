@@ -121,7 +121,7 @@ function FoodSearch({ iso, close }) {
     <div className="search">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
       <input className="input" placeholder={t('e.g. greek yoghurt')} value={q} autoFocus
-        onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') go() }} />
+        onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !busy) go() }} />
     </div>
     <div style={{ height: 10 }} />
     <Button variant="primary" onClick={go} disabled={busy || q.trim().length < 2}>{busy ? t('Searching…') : t('Search')}</Button>

@@ -50,7 +50,12 @@ export default function Home() {
   const yd = new Date(today); yd.setDate(yd.getDate() - 1)
   const yIso = isoOf(yd)
   const missedR = effectiveRoutine(S, yIso)
-  const missed = !S.active && missedR && !doneDays.has(yIso) && !routine && !doneDays.has(todayISO())
+  // Only for someone actually mid-plan: the weekly template says nothing about when the plan
+  // was created, so without the has-trained-recently guard this fires the morning after
+  // loading a plan, about a session that never existed.
+  const lastWo = S.workouts.length ? S.workouts[S.workouts.length - 1].d : null
+  const active14 = lastWo && new Date(yIso) - new Date(lastWo) < 14 * 86400000
+  const missed = !S.active && missedR && active14 && !doneDays.has(yIso) && !routine && !doneDays.has(todayISO())
 
   const wThisWeek = S.workouts.filter(w => weekKey(w.d) === weekKey(todayISO())).length
   const plannedPerWeek = Object.keys(S.week).filter(k => S.week[k]).length
