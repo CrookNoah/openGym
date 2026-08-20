@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — training with no equipment
+## v2.0.0 — 2026-08-20 — training with no equipment
 
 This fork is aimed at training at home with nothing but a floor. openGym already logged
 bodyweight work properly (v1.2.4); what it could not do was *plan* it, *progress* it or
@@ -166,6 +166,79 @@ at all, and until it is in a routine it is still not being trained.
 - 📈 **The exercise curve is no longer flat at zero.** Bodyweight exercises are charted by top
   set reps instead of top set weight. Clip on a dip belt and it moves back to load without
   losing the sessions underneath.
+
+### The gear list stops lumping every weight together
+
+"Weights and machines" was one tick that meant five different homes: a pair of dumbbells, one
+kettlebell, a loaded barbell, a commercial gym, and a dip belt are different answers to "what
+can you train", and one checkbox flattened them.
+
+- 🧰 **Five kinds of load instead of one.** Dumbbells, kettlebells, barbell & plates, machines &
+  cables, and a dip belt / weight vest are now separate ticks. The classifier files every
+  catalogue exercise under the right one — cables, levers and sleds under machines, "weighted"
+  under the vest.
+- **Old profiles lose nothing.** A profile that ticked the old combined box behaves as owning
+  the whole family until it edits the list, at which point it lands on the new keys. Nothing to
+  migrate, nothing filtered away behind your back.
+
+### The planner starts using what you own, what you did, and your actual calendar
+
+- 🏋️ **Dumbbells in the plan, not just the library.** Each movement pattern knows its loaded
+  equivalents (goblet squat, dumbbell bench, rows, Romanian deadlifts…), so a profile with
+  weights gets them planned with the load-based progression, not just offered in a list.
+- 📖 **It starts where your history says, not where a questionnaire guesses.** Any pattern you
+  trained in the last 90 days starts on the rung you actually did, clamped to what your kit can
+  reach. The questionnaire only decides what your history cannot.
+- 📆 **Tick the days you can train.** The generator places sessions on those days, spread as far
+  apart as they allow, and says so. Tick fewer days than you asked for and it trains the days
+  that exist rather than pretending.
+- 🔥 **The lean goal gets its shape back.** Press-and-pull supersets and a burpee finisher,
+  because short rests are the point of that goal — and the finisher doesn't count against the
+  coverage bar, so conditioning never crowds out a muscle.
+- 🎯 **Every generated routine carries its effort target** (how many reps to leave in the tank),
+  scaled by how hard you asked to be hit.
+
+### An easy week, on purpose
+
+- 🌙 **Take an easy week** (Settings, one tap): for seven days every session is prescribed at
+  about 60 % — same movements, fewer reps, shorter holds — and says so on every exercise. The
+  progression engine skips these sessions when judging progress, so resting never reads as
+  failing. Home shows the banner; ending it early is one tap.
+- 💪 **The workout screen shows the plan's effort target** ("aim RIR 2") while you train, and
+  when your last session's ratings came in far easier than the target, it says this one should
+  feel harder.
+
+### The food log grows the boring, load-bearing conveniences
+
+- 📈 **An Energy card in Stats**: calories per logged day against the target line, the average
+  over the window, and — beside it, always — how your body weight moved over the same window.
+  No invented "maintenance" arithmetic: the two numbers are shown together and the one
+  subtraction that matters is yours. Days you forgot are left out, not drawn as zero, and the
+  card says when the average speaks for half a window.
+- 🔁 **"Log it again."** The things you actually ate lately, most-often first, one tap to relog
+  with the numbers you last corrected. An empty day offers to copy yesterday whole; every
+  copied entry stays individually editable.
+- 📷 **Barcode scanning** where the platform can (with typing the digits always available), into
+  the same free Open Food Facts lookup as text search.
+
+### Standing back from the week
+
+- 🪜 **A Ladders card in Stats**: one bar per movement pattern you train, from easiest variation
+  to hardest, standing on the rung you most recently trained and counting only the rungs your
+  kit can reach. The progress chart for training that progresses by changing the exercise.
+- 📅 **A missed-day nudge.** Yesterday's planned session went unlogged and today is free? Home
+  offers exactly two honest moves: do it today, or let it go — which retro-marks yesterday as a
+  rest day so neither the nudge nor the calendar dot keeps litigating it.
+- 📏 **Tape measurements.** Neck to calves, any subset per session, same-day corrections instead
+  of duplicates, charted per site with its movement since last time. The scale says what
+  changed; the tape says where — recomposition is invisible without it.
+
+### Twelve languages, including all of the above
+
+- 🌍 Every string this release added — the planner questions, the gear list, the food log, the
+  progression's explanations, the ladders, the measurement sites — is translated into all
+  eleven locale packs (de, es, fr, it, pt, pl, tr, ru, zh, ko, hi), keeping English as the
+  source. The locale checker keeps the key sets identical so a gap can never ship silently.
 
 ## v1.2.4 — 2026-08-01
 

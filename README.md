@@ -47,6 +47,18 @@ admin dashboard only exist in a self-hosted instance.</sub>
 
 </div>
 
+## About this fork
+
+This is a calisthenics-first fork of [DuarteSantos8/openGym](https://github.com/DuarteSantos8/openGym),
+built for training at home with little or no equipment. Everything upstream still works —
+a barbell profile loses nothing — but on top of it this fork adds: an equipment list that
+filters the library and the plans to what you own; **variation ladders** so progress means a
+harder push-up rather than a heavier bar; a **plan generator** that asks five questions and
+designs the week (exercises, sets, reps, rest days) around your kit, your history and your
+calendar; a **food log** with a free database search and strictly optional AI photo
+estimates on your own API key; tape **measurements**; deliberate **easy weeks**; and pounds
+as the fresh-profile default. See the [changelog](CHANGELOG.md) for the whole story.
+
 ## Why
 
 Most workout apps lock your data behind a login on their servers, nag you to upgrade, or
