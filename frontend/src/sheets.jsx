@@ -3,7 +3,7 @@ import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { EXDB, EXIDX, BODYPARTS, isCardio, isBodyweightEq, allExercises, equipmentOf, exOr } from './lib/exercises.js'
 import { fmtDate, fmtNum, fmtVol, fmtDur, durPart, todayISO, uid, exCount, DAYN, MONTHS_LONG, ACCENTS } from './lib/format.js'
-import { lastEntryFor, bestWeightFor, bestRepsFor, bestHoldFor, buildSets, effectiveRoutineId, workoutVolume, volOf, setsDone, setsDoneActive, lastBW, supersetUnits, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, isBw, isPerSide, sideReps } from './lib/history.js'
+import { lastEntryFor, bestWeightFor, bestRepsFor, bestHoldFor, buildSets, effectiveRoutineId, workoutVolume, volOf, repsDone, holdSeconds, fmtSec, setsDone, setsDoneActive, lastBW, supersetUnits, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, isBw, isPerSide, sideReps } from './lib/history.js'
 import { beep, vibrate } from './lib/sound.js'
 import { t, instrFor, getLang, INSTR_LANGS } from './lib/i18n.js'
 import { nav } from './lib/nav.js'
@@ -136,6 +136,9 @@ export const loadStarterPlan = starterPlanSheet
 // below an everyday squat.
 const W_LO = 1
 const wHi = unit => (unit === 'lb' ? 660 : 300)
+// Where the slider opens for someone with no weigh-in yet — roughly an average adult in
+// whichever unit they are in, so the first drag is a nudge rather than a journey.
+const startWeight = unit => (unit === 'lb' ? 155 : 70)
 function WeightInput({ value, setValue, unit }) {
   const W_HI = wHi(unit)
   const clamp = x => Math.max(W_LO, Math.min(W_HI, Math.round((x || 0) * 10) / 10))
@@ -162,7 +165,7 @@ function BwSheet({ required, onDone, close }) {
   const st = useStore(s => s.S)
   const unit = st.unit
   const bw = lastBW(st)
-  const [v, setV] = useState(bw ? bw.w : 70)
+  const [v, setV] = useState(bw ? bw.w : startWeight(unit))
   const save = () => {
     const n = Math.round((v || 0) * 10) / 10
     if (!n || n <= 0) { toast(t('Enter a valid weight')); return }
@@ -308,7 +311,7 @@ export function bwDeltaColor(delta, currentW) {
 function GoalSheet({ close }) {
   const st = S()
   const bw = lastBW(st)
-  const [v, setV] = useState(st.targetW || (bw ? bw.w : 70))
+  const [v, setV] = useState(st.targetW || (bw ? bw.w : startWeight(st.unit)))
   return <>
     <h3>{t('Target weight')}</h3>
     <div className="muted small">{t('Your goal is drawn as a line through the weight charts, and gains/losses are colored by whether they move toward it.')}</div>
@@ -331,7 +334,7 @@ export const goalSheet = () => ui().openSheet(close => <GoalSheet close={close} 
 function OneRM({ ex }) {
   const st = useStore(s => s.S)
   const best = best1RM(st, ex.id)
-  const [w, setW] = useState(best ? best.w : (st.exWeights[ex.id] || {}).w || 20)
+  const [w, setW] = useState(best ? best.w : (st.exWeights[ex.id] || {}).w || (st.unit === 'lb' ? 45 : 20))
   const [r, setR] = useState(best ? best.r : 5)
   const est = estimate1RM(w, r)
   return <>
@@ -937,7 +940,9 @@ function WorkoutDetail({ w, close }) {
   const st = useStore(s => s.S)
   return <>
     <h3>{w.name}</h3>
-    <div className="muted small" style={{ marginBottom: 12 }}>{[fmtDate(w.d, true), ...durPart(w.end - w.start), fmtVol(volOf(w), st.unit), ...(w.bw ? [fmtNum(w.bw) + ' ' + st.unit] : [])].join(' · ')}</div>
+    <div className="muted small" style={{ marginBottom: 12 }}>{[fmtDate(w.d, true), ...durPart(w.end - w.start),
+      ...(repsDone(w) ? [t('{0} reps', repsDone(w))] : []), ...(holdSeconds(w) ? [fmtSec(holdSeconds(w))] : []),
+      fmtVol(volOf(w), st.unit), ...(w.bw ? [fmtNum(w.bw) + ' ' + st.unit] : [])].join(' · ')}</div>
     {w.entries.map((e, i) => {
       const ex = EXIDX[e.id]
       return <div key={i} className="row" style={{ marginBottom: 12, alignItems: 'flex-start' }}>
@@ -1000,7 +1005,9 @@ export function WorkoutRow({ w, onClick }) {
   return <div className="item" onClick={onClick}>
     <span className="lrow-i" style={{ width: 34, height: 34, borderRadius: 8, fontSize: 19 }}><Icon name={glyph} /></span>
     <div className="grow"><div className="tt">{w.name}</div>
-      <div className="ss">{[fmtDate(w.d, true), ...durPart(w.end - w.start), t('{0} sets', setsDone(w)), fmtVol(volOf(w), st.unit)].join(' · ')}</div></div>
+      <div className="ss">{[fmtDate(w.d, true), ...durPart(w.end - w.start), t('{0} sets', setsDone(w)),
+        ...(repsDone(w) ? [t('{0} reps', repsDone(w))] : []), ...(holdSeconds(w) ? [fmtSec(holdSeconds(w))] : []),
+        fmtVol(volOf(w), st.unit)].join(' · ')}</div></div>
     {w.prs && w.prs.length > 0 && <span className="pr"><Icon name="trophy" />{w.prs.length} PR</span>}
     <Icon name="chevronRight" className="chev" />
   </div>
@@ -1099,6 +1106,11 @@ function FinishSummary({ w, prs, e1prs = [], close }) {
       <div className="tile"><div className="l">{t('Volume')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fmtVol(volOf(w), st.unit)}</div></div>
       <div className="tile"><div className="l">{t('Sets')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{setsDone(w)}</div></div>
       <div className="tile"><div className="l">{t('PRs')}</div><div className="v" style={{ fontSize: 20 }}>{prs.length || '—'}</div></div>
+      {/* The two numbers that are literally counted rather than derived. Volume above is an
+          estimate once bodyweight is involved (lib/history.js); these are not, so on a
+          floor-only session they are the honest headline. */}
+      {repsDone(w) > 0 && <div className="tile"><div className="l">{t('Reps')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{repsDone(w)}</div></div>}
+      {holdSeconds(w) > 0 && <div className="tile"><div className="l">{t('Held')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fmtSec(holdSeconds(w))}</div></div>}
     </div>
     {(prs.length > 0 || e1prs.length > 0) && <div style={{ textAlign: 'left', marginBottom: 12 }}>
       {prs.map(id => <div key={id} className="small accent capitalize row" style={{ gap: 5 }}><Icon name="trophy" style={{ fontSize: 13 }} />{t('New PR:')} {(EXIDX[id] || {}).n || id}</div>)}

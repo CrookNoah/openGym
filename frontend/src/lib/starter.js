@@ -55,45 +55,54 @@ export const STARTER_PLANS = [
     days: 'Mon · Wed · Fri',
     week: { 1: 0, 3: 0, 5: 0 },
     routines: [
+      // One routine trained three times: every pattern gets 3x a week, which is the whole
+      // advantage a beginner has over a split and the reason this plan is six exercises.
       { name: 'Full Body', emoji: 'figureStrength', ex: [
         reps('3211', 3, 8, 15),    // kneeling push-up
         reps('3166', 3, 10, 20),   // bodyweight standing row
         reps('3132', 3, 10, 20),   // potty squat with support
         reps('3013', 3, 12, 25),   // low glute bridge on floor
+        reps('0489', 3, 10, 20),   // hyperextension — the spinal work nothing else here does
         hold('3239', 3, 30, 60),   // kneeling plank, shoulder taps
-        reps('0872', 3, 10, 20),   // reverse crunch
       ] },
     ],
   },
   {
-    key: 'bw-ppl',
-    name: 'Push / Pull / Legs — bodyweight',
-    sub: 'The classic split with no equipment at all.',
-    note: 'Pulling without a bar leans on self-resistance and towel rows, which work but cap out sooner than the rest. A pull-up bar is the one purchase that changes this plan the most — add it in Settings and the pulling ladders grow.',
+    key: 'bw-ulf',
+    name: 'Upper / Lower / Full body',
+    sub: 'Three days, everything trained about twice a week.',
+    note: 'A three-day Push/Pull/Legs hits each muscle once a week, which is the wrong shape for three sessions — so this splits upper and lower and finishes the week with a full-body day. Pulling without a bar leans on self-resistance and towel rows: they work, but they cap out sooner than everything else. A pull-up bar is the one purchase that changes this plan the most — tick it in Settings and the pulling ladders grow.',
     gear: [],
     days: 'Mon · Wed · Fri',
     week: { 1: 0, 3: 1, 5: 2 },
     routines: [
-      { name: 'Push', emoji: 'figureStrength', ex: [
+      // Pressing and pulling alternate rather than stacking, so the third press of the day is
+      // not being done on triceps that three earlier sets already emptied.
+      { name: 'Upper', emoji: 'arm', ex: [
         reps('0662', 4, 10, 20),   // push-up
-        reps('0279', 3, 8, 15),    // decline push-up
-        reps('0815', 3, 10, 20),   // triceps dips floor
-        reps('0259', 3, 8, 15),    // close-grip push-up
-        hold('3665', 3, 45, 90),   // power point plank
-      ] },
-      { name: 'Pull', emoji: 'pullup', ex: [
         reps('3165', 4, 12, 20),   // standing row (with towel)
+        reps('0279', 3, 8, 15),    // decline push-up — the closest a floor gets to overhead
         side('3162', 3, 16, 24),   // standing one arm row
-        reps('3158', 3, 12, 20),   // standing close-grip row
-        reps('3168', 3, 12, 20),   // squatting row
-        reps('0865', 3, 10, 20),   // lying leg-hip raise
+        reps('0815', 3, 10, 20),   // triceps dips floor
+        reps('3021', 3, 12, 20),   // scapula push-up — serratus and traps, otherwise skipped
+        hold('3665', 3, 45, 90),   // power point plank — anti-extension core
       ] },
-      { name: 'Legs', emoji: 'legs', ex: [
+      { name: 'Lower', emoji: 'legs', ex: [
         reps('3119', 4, 15, 25),   // potty squat
+        reps('0696', 3, 6, 12),    // self assisted inverse leg curl — the only real hamstring
         side('3470', 3, 16, 24),   // forward lunge
-        reps('3013', 3, 15, 25),   // low glute bridge on floor
+        side('3645', 3, 16, 24),   // single leg bridge
+        side('3667', 3, 20, 30),   // side lying hip adduction — adductors, otherwise skipped
         reps('1373', 3, 20, 30),   // standing calf raise
-        reps('0689', 3, 12, 20),   // seated leg raise
+        reps('0865', 3, 12, 20),   // lying leg-hip raise — flexion core, and the hip flexors
+      ] },
+      { name: 'Full Body', emoji: 'figureStrength', ex: [
+        reps('0259', 3, 8, 15),    // close-grip push-up
+        reps('3158', 3, 12, 20),   // standing close-grip row
+        side('2368', 3, 16, 24),   // split squats
+        reps('3013', 3, 15, 25),   // low glute bridge on floor
+        reps('0489', 3, 12, 20),   // hyperextension — lower back
+        hold('0705', 3, 30, 60),   // side bridge — obliques
       ] },
     ],
   },

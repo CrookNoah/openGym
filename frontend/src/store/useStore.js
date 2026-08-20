@@ -7,7 +7,10 @@ import { MOBILE, nativeLoad, nativeSave, syncReminder } from '../lib/mobile.js'
 
 const KEY = 'gym_state_v1'
 export const DEF = {
-  unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: 'en',
+  // Pounds by default. Only ever reaches a *fresh* profile — loaded state is overlaid on
+  // DEF, so a profile that already chose kg keeps it, and switching only relabels (numbers
+  // are never converted, same as it always was).
+  unit: 'lb', restSec: 90, sound: true, keepAwake: true, lang: 'en',
   theme: 'dark', accent: 'lime', body: 'male', targetW: null,
   bodyweight: [], routines: [], week: {}, dayPlan: {},
   exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',

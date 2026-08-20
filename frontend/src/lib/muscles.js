@@ -69,9 +69,23 @@ const BY_BODYPART = {
 
 const SECONDARY = 0.4   // a supporting muscle counts this much against a primary
 
+// A couple of entries are filed under the wrong body part outright. That is a different
+// problem from the naming inconsistency ALIAS absorbs: the name is right and the
+// classification is simply wrong, so no amount of alias-matching recovers it. Both of these
+// sit on a variation ladder, which makes them load-bearing — left alone, the main squat
+// progression reports itself on the abs row of the muscle map and legs look untrained.
+// Corrected by id, deliberately: a name-based rule here would be guessing at the dataset.
+const MISTAGGED = {
+  // "potty squat" — a deep bodyweight squat, filed under waist/abs
+  '3119': { quadriceps: 1, gluteal: 0.6, adductors: 0.4 },
+  // "pike-to-cobra push-up" — a shoulder-led press, filed under upper legs/glutes
+  '3662': { deltoids: 1, chest: 0.5, triceps: 0.4 },
+}
+
 /** Muscles one exercise trains: { slug: 0…1 }. */
 export function musclesOf(ex) {
   if (!ex) return {}
+  if (MISTAGGED[ex.id]) return { ...MISTAGGED[ex.id] }
   const out = {}
   const add = (name, w) => {
     const slug = ALIAS[String(name || '').toLowerCase().trim()]

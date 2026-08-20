@@ -45,6 +45,40 @@ three sides: the app assumed progress meant a heavier bar.
 - The bodyweight plan says out loud that pulling without a bar caps out sooner than the rest,
   because it does — vertical pulling is the one pattern a floor genuinely cannot give you.
 
+### Programming, audited rather than asserted
+
+The first cut of the floor-only plans was a bodyweight Push/Pull/Legs, and running it through
+openGym's own muscle-balance engine showed it was not good enough. Three sessions a week with a
+PPL split trains everything exactly once a week; the push day stacked ten sets of one pattern,
+the last of them on triceps three earlier exercises had already emptied; and quads (2.8 weekly
+effective sets), hamstrings (2.4), adductors, lower back, obliques and serratus were barely or
+never trained.
+
+- 🔁 **Upper / Lower / Full body** replaces it. Same three days, but pressing and pulling
+  alternate instead of stacking, and everything gets hit about twice a week. Quads go 2.8 → 9.4
+  weekly effective sets, hamstrings 2.4 → 10.2, and adductors, lower back, serratus and obliques
+  go from nothing to trained.
+- **What a floor cannot do is said out loud, not papered over.** Traps and shins have no
+  floor-only exercise worth the name, and the test suite asserts they are the *only* two things
+  left untrained — so an accidental gap fails a test instead of quietly appearing.
+- The plans now carry tests for the properties that took the thought: frequency, no pattern
+  taking more than 45 % of a session's sets, and a session length somebody will finish.
+- 🐛 **Two upstream mistags corrected.** The dataset files the main squat progression
+  ("potty squat") under waist/abs and a shoulder-led press ("pike-to-cobra push-up") under
+  upper legs/glutes. Both sit on a variation ladder, so left alone a leg day reported itself on
+  the abs row of the muscle map. Corrected by id in `lib/muscles.js`, which already exists to
+  normalise the dataset's inconsistent muscle naming.
+
+### Pounds, and numbers that are counted rather than derived
+
+- ⚖️ **A fresh profile starts in lb.** Only a fresh one: a profile that already chose kg keeps
+  it, and switching still only relabels — logged numbers are never converted, exactly as before.
+  The weigh-in slider and the 1RM calculator open at sensible pounds values instead of kilo ones.
+- 🔢 **Reps and hold time sit next to the volume**, on the finish summary, every history row and
+  the workout detail. Bodyweight volume is an *estimate* — your weigh-in times a coarse
+  per-movement fraction — while "96 reps · 2:15" is simply what happened. Both are shown, so the
+  derived number never has to be taken on trust.
+
 ### Bodyweight training that shows up in the numbers
 
 - ⚖️ **Volume counts your body.** A floor-only session used to read 0 kg on the workout row,
