@@ -13,6 +13,7 @@ import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp, gearSheet } from '../sheets.jsx'
 import { gearSummary } from '../lib/gear.js'
 import { aiKeySheet, foodTargetSheet } from '../foodsheets.jsx'
+import { planWizardSheet } from '../planner.jsx'
 import { hasKey } from '../lib/foodai.js'
 import { targetOf, MACROS, MACRO_NAME } from '../lib/food.js'
 import Icon from '../components/Icon.jsx'
@@ -199,7 +200,8 @@ export default function Settings() {
 
     {/* ---------- data: fill it, bring things over, back it up, wipe it ---------- */}
     <Section title={t('Data')}>
-      <Row icon="sparkles" iconTint="var(--acc)" title={t('Load a starter plan')} accessory="chevron" onClick={loadStarterPlan} />
+      <Row icon="sparkles" iconTint="var(--acc)" title={t('Build me a plan')} subtitle={t('Answer a few questions and openGym designs the week')} accessory="chevron" onClick={planWizardSheet} />
+      <Row icon="clipboard" iconTint="var(--blue)" title={t('Load a ready-made plan')} accessory="chevron" onClick={loadStarterPlan} />
       <Row icon="shuffle" iconTint="var(--teal)" title={t('Import from another app')}
         subtitle={t('FitNotes, Strong, Hevy — or body weight from Apple Health')}
         accessory="chevron" onClick={() => importRef.current.click()} />

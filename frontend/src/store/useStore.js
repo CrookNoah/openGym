@@ -22,6 +22,9 @@ export const DEF = {
   // here — see lib/foodai.js; a credential has no business in a payload that gets PUT to a
   // server and written into every backup.
   food: [], foodTarget: null,
+  // Last answers given to the plan wizard (lib/planner.js), so regenerating does not mean
+  // answering everything again. Null until the wizard is used.
+  plannerAnswers: null,
   // effort: which per-set effort scale is logged — 'none' | 'rir' | 'rpe'. null, not 'none', so
   // that a profile which never chose (loaded state is overlaid on DEF, on every path: local,
   // server pull, backup import) still falls back to the `showRir` boolean this replaced and

@@ -69,6 +69,36 @@ never trained.
   the abs row of the muscle map. Corrected by id in `lib/muscles.js`, which already exists to
   normalise the dataset's inconsistent muscle naming.
 
+### It builds the plan now, instead of asking you to
+
+Picking exercises is the part of a training app people are worst at, and the part an app is
+best placed to do — openGym already knew the movement patterns, which of them your kit can
+reach, what each one trains, and how hard every variation is. It had just never put those
+together, so the answer to "what should I do" was still a library and a search box.
+
+- 🪄 **Answer five questions, get a week.** Goal, experience, how hard you want to be hit,
+  session length, days available. openGym picks the split, the exercises, the sets and reps,
+  the rest between sets — and which days you rest.
+- 📅 **Rest days are chosen and explained.** Four days becomes two pairs with a break in the
+  middle; five puts the rest after the third day, not the fourth. Every arrangement comes with
+  the sentence explaining why it is shaped that way. Push/Pull/Legs is not offered below six
+  days, because three days of it trains everything once a week.
+- 🔍 **It audits its own output before you see it.** After generating, it measures weekly
+  effective sets per muscle with the same engine that draws the muscle map, finds what is
+  under-trained, and backfills the movement that most directly fixes it — into the session
+  that trains that half of the body. The preview says what it added and why.
+- **The bar is scaled twice, to keep the check honest.** By how directly your kit can train a
+  muscle — obliques on a bare floor are only ever a supporting muscle, so demanding the same
+  number as chest would report a gap no training could close. And by how much training the week
+  contains, because calling one short session "fifteen failures" tells you nothing.
+- 👀 **Nothing is written until you say so.** The preview shows the week, the body map, the
+  weekly sets per muscle, what it backfilled, anything still light, and what your kit cannot
+  train at all. Then you choose: replace your plan, or keep both.
+- **Difficulty scales with the ladder, not with an index.** The push ladder is ten rungs on a
+  floor and the overhead one is four — an absolute index put "some experience" on a kneeling
+  push-up and a handstand in the same session. It picks by proportion now, nudged by the goal,
+  because a five-rep target implies a harder variation than a fifteen-rep one.
+
 ### A food log, with the AI part strictly optional
 
 Training and eating are the same project, and openGym already knew your body weight — so the

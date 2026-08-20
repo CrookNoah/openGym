@@ -6,6 +6,7 @@ import { fmtNum, fmtDate, todayISO, isoOf, weekKey, DAYS } from '../lib/format.j
 import { t, dateLocale } from '../lib/i18n.js'
 import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, loadStarterPlan, bwDeltaColor } from '../sheets.jsx'
 import { addFoodSheet } from '../foodsheets.jsx'
+import { planWizardSheet } from '../planner.jsx'
 import { dayTotals, targetOf, MACROS, MACRO_NAME } from '../lib/food.js'
 import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
@@ -82,9 +83,10 @@ export default function Home() {
           <span className="lrow-i"><Icon name="sparkles" /></span>
           <div className="big" style={{ fontSize: 22 }}>{t('Welcome!')}</div>
         </div>
-        <div className="muted small" style={{ marginBottom: 12 }}>{t('Set up your weekly routine to get going — or load a ready-made plan that matches the kit you have.')}</div>
-        <Button variant="primary" icon="sparkles" onClick={loadStarterPlan}>{t('Load a starter plan')}</Button>
-        <div style={{ height: 8 }} /><Button onClick={() => nav('/plan')}>{t('Build my own plan')}</Button>
+        <div className="muted small" style={{ marginBottom: 12 }}>{t('Answer a few questions and openGym will pick the exercises, the sets and reps, and which days to rest.')}</div>
+        <Button variant="primary" icon="sparkles" onClick={planWizardSheet}>{t('Build me a plan')}</Button>
+        <div style={{ height: 8 }} /><Button onClick={loadStarterPlan}>{t('Or pick a ready-made plan')}</Button>
+        <div style={{ height: 8 }} /><Button variant="ghost" className="dim" onClick={() => nav('/plan')}>{t('Build my own from scratch')}</Button>
       </div>
     )}
 
