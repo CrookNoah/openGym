@@ -1,5 +1,43 @@
 # Changelog
 
+## v2.1.0 — 2026-08-21 — the week made visible
+
+v2.0 built the engines; this release points them at the screens where the questions actually
+get asked. "What is being hit?" now has an answer before training (Home), while planning
+(Plan), mid-slump (the workout screen) and in ambition (the ladder, laid out end to end).
+
+### What is being hit, answered everywhere
+
+- 🏷️ **The today card names its muscles.** Home shows what today's session trains, as chips,
+  without opening anything.
+- ✅ **A live Week check on the Plan tab.** The wizard's coverage audit — a body map of the
+  week, what is missed, what is light, what the kit cannot reach — now runs permanently on
+  the plan as it stands, recomputed as you edit. A hand-edited plan is held to the same
+  kit-scaled, week-scaled bar as a generated one, and a test asserts the two measures can
+  never quietly diverge.
+- ⚠️ **Back-to-back warnings.** Drag two sessions that hammer the same muscles onto
+  consecutive days and the Week check says so, and why it matters.
+
+### The ladder, laid out
+
+- 🪜 **Tap any ladder in Stats to see the whole road** — every rung with its demo, easiest
+  first, your current step marked, unreachable rungs dimmed and named with the kit that
+  unlocks them. "A one-arm push-up is four steps away" is now something the app can show you.
+
+### Bad days and warm-ups
+
+- ⬇️ **"Too hard today?"** on any ladder exercise mid-workout swaps in the easier variation
+  for this session only — plan and history untouched, next time opens on the planned rung.
+  The engine's own drop-back (after repeated stalls) still rewrites the routine; this never
+  does.
+- 🔥 **Warm-up sets, properly excluded.** A per-exercise toggle adds one half-effort set
+  marked W — half the weight on a loaded lift, half the reps on bodyweight, half the hold on
+  a timed one. It is invisible to progression end to end: judging, next-session seeding, the
+  prescribed-set count and the effort statistics all count working sets only, and imported
+  histories (Strong/Hevy) now carry their warm-up rows under the same flag instead of reading
+  as missed sessions.
+- All of it in all twelve languages, same as everything else.
+
 ## v2.0.0 — 2026-08-20 — training with no equipment
 
 This fork is aimed at training at home with nothing but a floor. openGym already logged
@@ -238,7 +276,9 @@ can you train", and one checkbox flattened them.
 - 🌍 Every string this release added — the planner questions, the gear list, the food log, the
   progression's explanations, the ladders, the measurement sites — is translated into all
   eleven locale packs (de, es, fr, it, pt, pl, tr, ru, zh, ko, hi), keeping English as the
-  source. The locale checker keeps the key sets identical so a gap can never ship silently.
+  source. The locale checker keeps the eleven key sets identical, so a key added to one
+  locale can never silently miss another — a string never added to any locale still falls
+  back to English, which is what the release process's string inventory exists to catch.
 
 ## v1.2.4 — 2026-08-01
 

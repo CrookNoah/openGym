@@ -19,9 +19,9 @@ No account on someone else's server, no subscription, no ads. Just `docker compo
 ![Docker](https://img.shields.io/badge/Docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)
 ![No tracking](https://img.shields.io/badge/telemetry-none-f472b6?style=flat-square)
 <br>
-![GitHub last commit](https://img.shields.io/github/last-commit/DuarteSantos8/openGym?style=flat-square)
-[![GitHub stars](https://img.shields.io/github/stars/DuarteSantos8/openGym?style=flat-square)](https://github.com/DuarteSantos8/openGym/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/DuarteSantos8/openGym?style=flat-square)](https://github.com/DuarteSantos8/openGym/issues)
+![GitHub last commit](https://img.shields.io/github/last-commit/CrookNoah/openGym?style=flat-square)
+[![GitHub stars](https://img.shields.io/github/stars/CrookNoah/openGym?style=flat-square)](https://github.com/CrookNoah/openGym/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/CrookNoah/openGym?style=flat-square)](https://github.com/CrookNoah/openGym/issues)
 
 </div>
 
@@ -43,7 +43,8 @@ No account on someone else's server, no subscription, no ads. Just `docker compo
 
 No signup, nothing to install — it runs entirely in your browser on example data.<br>
 <sub>There's no server behind the demo, so passkey sign-in, sync across devices and the
-admin dashboard only exist in a self-hosted instance.</sub>
+admin dashboard only exist in a self-hosted instance. The site and demo above are
+upstream's — they run the original app, without this fork's additions.</sub>
 
 </div>
 
@@ -93,14 +94,14 @@ as a home-screen app, passkey sign-in, offline support, sync across your phone a
 - 🌍 **12 languages** — full UI translation (EN, DE, ES, FR, IT, PT, PL, TR, RU, ZH, KO, HI); exercise instructions localized in 10 of them, loaded on demand so the app stays fast
 - 📥 **Bring your history with you** — import from **FitNotes** (Android and iOS), **Strong** and **Hevy**, or body weight straight out of an **Apple Health** export. Exercise names are matched against the library and anything unrecognised becomes one of your own exercises, so nothing in the file is dropped
 - 📦 **Yours to keep** — one-tap JSON export/import, guest mode, **no telemetry**
-- 📱 **Standalone Android app** — the whole tracker as a sideloadable APK: no account, no server, data on the phone, native workout reminders ([download](https://opengym.duarte-santos.ch))
+- 📱 **Standalone Android app** — the whole tracker as a sideloadable APK: no account, no server, data on the phone, native workout reminders ([download from this fork’s releases](https://github.com/CrookNoah/openGym/releases))
 
 ## Quick start (self-host)
 
 You need [Docker](https://docs.docker.com/get-docker/) with Compose.
 
 ```bash
-git clone https://github.com/DuarteSantos8/openGym
+git clone https://github.com/CrookNoah/openGym
 cd openGym
 cp .env.example .env
 docker compose pull   # grab prebuilt images (amd64 + arm64) — skip to build from source instead
@@ -122,7 +123,7 @@ no backend — everything stays on the phone, with native workout-day reminders 
 backups. Self-hosting gets you multi-device sync and profiles for friends & family; the
 mobile app is the install-and-done flavor.
 
-- **Android:** [**download the APK**](https://opengym.duarte-santos.ch) and sideload it —
+- **Android:** [**download the APK**](https://github.com/CrookNoah/openGym/releases) and sideload it —
   openGym is deliberately not on the Play Store. Or build it yourself: **[docs/MOBILE.md](docs/MOBILE.md)**.
 - **iPhone:** Apple doesn't allow installing apps outside the App Store, so there is no iOS
   download. Self-host and add it to your home screen from Safari (it's a full PWA), or build
@@ -173,7 +174,7 @@ Push notification keys are generated on first run and saved to `./data/vapid.jso
 
 Rough, community-driven — ideas and PRs welcome:
 
-- [x] Standalone mobile app — Android APK to sideload ([download](https://opengym.duarte-santos.ch)); on iOS as a self-hosted PWA (no store listings planned)
+- [x] Standalone mobile app — Android APK to sideload ([download from this fork’s releases](https://github.com/CrookNoah/openGym/releases)); on iOS as a self-hosted PWA (no store listings planned)
 - [x] Automatic progression programs (linear, Greyskull LP, double progression) with stalls and deloads
 - [x] Estimated 1RM per exercise
 - [ ] Percentage / training-max programming (5/3/1-style) on top of the progression engine
