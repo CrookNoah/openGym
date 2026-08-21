@@ -300,11 +300,16 @@ export function buildSlot(S, pattern, slotIndex, answers, used) {
   const rungs = rungsFor(S, pattern)
   if (!rungs.length) return null
   const first = pickRung(S, pattern, answers)
-  // Do not repeat a movement inside one session; step along the ladder instead.
+  // Do not repeat a movement inside one session; step along the ladder instead — to the
+  // NEAREST unused rung, harder first, easier as the fallback. The old fallback took the
+  // bottom of the ladder, which is how a barbell lifter's second push slot became wall
+  // push-ups: an extra slot is more of the same work, not a regression to day one.
   let id = first
   if (used && used.has(id)) {
     const i = rungs.indexOf(id)
-    id = rungs.find((r, j) => j > i && !used.has(r)) || rungs.find(r => !used.has(r)) || null
+    id = rungs.find((r, j) => j > i && !used.has(r))
+      || [...rungs.slice(0, Math.max(0, i))].reverse().find(r => !used.has(r))
+      || null
   }
   if (!id || !EXIDX[id]) return null
 
@@ -674,6 +679,18 @@ export function generatePlan(S, answersIn) {
     if (!progressed) break
   }
   const gaps = coverageGaps(S, routines, week)
+
+  // ---- put every session in coach order ----
+  // Backfill appends and the finisher lands before backfill even runs, so by this point a
+  // session can read "…burpees, then four calm sets of scapula push-ups". The order every
+  // coach writes: main pattern work first (in the order the split chose), accessories after,
+  // conditioning dead last. A stable sort, so nothing within a class ever reshuffles.
+  // Runs before supersets, which pair *adjacent* entries and must see the final order.
+  const ACCESSORY_IDS = new Set(ACCESSORIES.flatMap(a => a.ids))
+  const orderClass = e => ((EXIDX[e.id] || {}).bp === 'cardio' ? 2 : ACCESSORY_IDS.has(e.id) ? 1 : 0)
+  routines.forEach(r => {
+    r.ex = r.ex.map((e, i) => [e, i]).sort((a, b) => (orderClass(a[0]) - orderClass(b[0])) || (a[1] - b[1])).map(x => x[0])
+  })
 
   // ---- supersets, for the goal whose rest periods want them ----
   // Adjacent opposing pairs (a press with a pull) share a superset id, which is exactly the

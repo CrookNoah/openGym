@@ -320,6 +320,25 @@ describe('generatePlan', () => {
       const { routines, week } = generatePlan(GYM, ans)
       const warn = adjacentOverlap({ ...GYM, routines, week })
       expect(warn, JSON.stringify({ ans, warn: warn.map(w => [w.day, w.next, w.shared]) })).toEqual([])
+      // And an extra slot steps to a *nearby* rung: past beginner level, a gym plan must
+      // never prescribe the very bottom of a ladder (wall push-ups next to a bench press).
+      if (ans.level !== 'new') routines.forEach(r => r.ex.forEach(e => {
+        expect(['0659', '3132'], `${JSON.stringify(ans)}/${r.name}: ${e.id}`).not.toContain(e.id)
+      }))
+    })
+  })
+
+  it('writes every session in coach order: mains, accessories, conditioning last', SWEEP, () => {
+    everyCombo.forEach(ans => {
+      planFor(ans).routines.forEach(r => {
+        // Class per entry: 0 = a movement-pattern slot (ladder rung or loaded lift),
+        // 1 = accessory, 2 = cardio. Once the class steps up it must never step back down.
+        const cls = r.ex.map(e => (EXIDX[e.id].bp === 'cardio' ? 2 : patternKeyOf(e.id) ? 0 : 1))
+        for (let i = 1; i < cls.length; i++) {
+          expect(cls[i], `${JSON.stringify(ans)}/${r.name}: ${r.ex.map(x => EXIDX[x.id].n).join(' → ')}`)
+            .toBeGreaterThanOrEqual(cls[i - 1])
+        }
+      })
     })
   })
 
