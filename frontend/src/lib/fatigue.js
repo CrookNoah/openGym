@@ -69,7 +69,13 @@ export function suggestEasyWeek(S, now = Date.now()) {
   if (since(S.easyUntil) < AFTER_EASY_DAYS) return { suggest: false, reasons: [] }
   if (since(S.fatigueDismissed) < SNOOZE_DAYS) return { suggest: false, reasons: [] }
 
-  const weeks = streakWeeks(S)
+  // A completed easy week resets the clock: deload sessions are still logged workouts, so
+  // the raw streak sails straight through them — clamp to the weeks since the deload ended,
+  // or the card returns three weeks after every easy week forever.
+  const sinceEasy = S.easyUntil
+    ? Math.max(0, Math.floor((now - new Date(S.easyUntil + 'T12:00:00').getTime()) / (7 * 86400000)))
+    : Infinity
+  const weeks = Math.min(streakWeeks(S), sinceEasy)
   const stalled = stalledCount(S)
   const recent = windowRir(S, 14, 0)
   const before = windowRir(S, 28, 14)

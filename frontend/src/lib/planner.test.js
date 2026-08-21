@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   generatePlan, applyPlan, pickRung, weekShape, splitFor, splitName, thresholds,
   coverageGaps, weeklyLoad, weekSlotCount, candidatePool, bestPerSet, trainableMuscles,
-  GOALS, LEVELS, INTENSITY, LENGTHS, MIN_DAYS, MAX_DAYS, MIN_WEEKLY_SETS, DEFAULT_ANSWERS,
+  GOALS, LEVELS, INTENSITY, LENGTHS, MIN_DAYS, MAX_DAYS, MIN_WEEKLY_SETS, DEFAULT_ANSWERS, buildSlot,
 } from './planner.js'
 import { EXIDX } from './exercises.js'
 import { canDo } from './gear.js'
-import { rungsFor } from './ladders.js'
+import { rungsFor, ladderOf } from './ladders.js'
 import { modeOf, isBw } from './history.js'
 import { adjacentOverlap } from './week.js'
 import { nextPrescription } from './progression.js'
@@ -575,11 +575,27 @@ describe('A/B variety and accessory ranges', () => {
     expect(upperB.ex.map(e => e.id).join()).not.toBe(upperA.ex.map(e => e.id).join())
   })
 
-  it('swaps in the alternative loaded lift on a B-day when the kit has one', () => {
+  it('gives the repeat sessions of a six-day split their own emphasis', () => {
+    // The 4-day split has distinct session keys (upper vs upperB), so only the 6-day PPL
+    // actually exercises the variant mechanism — this is the test that fails if
+    // loadedFor's nth parameter or buildSlot's rung shift is quietly removed.
     const GYM2 = { routines: [], workouts: [], unit: 'lb' }
-    const { routines } = generatePlan(GYM2, A({ days: 4 }))
-    const pressA = routines[0].ex[0], pressB = routines[2].ex[0]
-    expect(pressA.id).not.toBe(pressB.id)
+    const { routines } = generatePlan(GYM2, A({ days: 6 }))
+    const first = routines[0]
+    const second = routines.find(r => r.name === first.name + ' 2')
+    expect(second).toBeTruthy()
+    expect(second.ex[0].id, 'B-day should open on the alternative loaded lift').not.toBe(first.ex[0].id)
+    // And on a floor, where there is nothing loaded to alternate, the rungs shift instead.
+    const f = generatePlan(FLOOR, A({ days: 6 }))
+    const fFirst = f.routines[0]
+    const fSecond = f.routines.find(r => r.name === fFirst.name + ' 2')
+    expect(fSecond.ex.map(e => e.id).join()).not.toBe(fFirst.ex.map(e => e.id).join())
+  })
+
+  it('shifts a repeat slot one rung over, directly', () => {
+    const a = buildSlot(FLOOR, 'push', 0, A(), new Set(), 0)
+    const b = buildSlot(FLOOR, 'push', 0, A(), new Set(), 1)
+    expect(a.id).not.toBe(b.id)
   })
 
   it('runs accessories a notch higher than a strength goal main lift', () => {
@@ -603,6 +619,15 @@ describe('anything to train around', () => {
       })
       expect(report.avoidedNames.length).toBe(1)
     })
+  })
+
+  it('wrist keeps the loaded overhead press and drops only the handstand line', () => {
+    const { routines } = generatePlan(GYM2, A({ days: 4, length: 'long', avoid: ['wrist'] }))
+    const ids = routines.flatMap(r => r.ex.map(e => e.id))
+    // Every remaining vpush exercise is a loaded lift, never a bodyweight ladder rung —
+    // a barbell shoulder press does not load a bent wrist; a handstand push-up does.
+    ids.forEach(id => { if (patternKeyOf(id) === 'vpush') expect(ladderOf(id), EXIDX[id].n).toBe(null) })
+    expect(ids.some(id => patternKeyOf(id) === 'vpush')).toBe(true)
   })
 
   it('substitutes rather than thinning the session', () => {

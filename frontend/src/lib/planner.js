@@ -19,7 +19,7 @@ import { PATTERN_GROUP } from './kit.js'
 import { loadOf, MUSCLES, MUSCLE_NAME, hardMusclesOf, sharedHard } from './muscles.js'
 import { canDo, hasGear } from './gear.js'
 import { isHeldRung } from './ladders.js'
-import { uid } from './format.js'
+import { uid, todayISO } from './format.js'
 
 /* ============================ the answers ============================ */
 
@@ -76,16 +76,28 @@ export const AVOID = [
   { key: 'wrist', name: 'Wrists', hint: 'Skips handstand-line work on loaded wrists.' },
 ]
 const PATTERN_JOINTS = {
-  vpush: ['shoulder', 'wrist'],
+  vpush: ['shoulder'],
   dip: ['shoulder'],
   squat: ['knee'],
   hinge: ['lowback'],
 }
+// Finer than a whole pattern: the wrist complaint is about the bodyweight handstand line
+// (hands flat on the floor under load), not about a dumbbell or barbell shoulder press held
+// in a neutral grip — so 'wrist' blocks the vpush LADDER while its loaded lifts stay in.
+const LADDER_JOINTS = {
+  vpush: ['wrist'],
+}
 const avoidSet = a => new Set(Array.isArray(a && a.avoid) ? a.avoid : [])
-/** Is this movement pattern off the table for these answers? */
+/** Is this movement pattern off the table entirely for these answers? */
 export const patternAvoided = (pattern, answers) => {
   const av = avoidSet(answers)
   return !!(PATTERN_JOINTS[pattern] || []).some(j => av.has(j))
+}
+/** Is the pattern's bodyweight ladder off the table (loaded lifts may still be fine)? */
+export const ladderAvoided = (pattern, answers) => {
+  if (patternAvoided(pattern, answers)) return true
+  const av = avoidSet(answers)
+  return !!(LADDER_JOINTS[pattern] || []).some(j => av.has(j))
 }
 
 export const DEFAULT_ANSWERS = { goal: 'muscle', level: 'some', intensity: 'normal', length: 'medium', days: 3 }
@@ -325,7 +337,8 @@ export function buildSlot(S, pattern, slotIndex, answers, used, variant = 0) {
       ...(lside ? { side: true } : {}),
     }
   }
-  const rungs = rungsFor(S, pattern)
+  // The ladder may be off the table while the loaded lift above was fine — see LADDER_JOINTS.
+  const rungs = ladderAvoided(pattern, answers) ? [] : rungsFor(S, pattern)
   if (!rungs.length) return null
   const first = pickRung(S, pattern, answers)
   // Do not repeat a movement inside one session; step along the ladder instead — to the
@@ -502,6 +515,7 @@ export function fillersFor(S, muscle, answers) {
     // A filler from a pattern the answers avoid would smuggle the joint stress back in
     // through the coverage door.
     .filter(x => !patternAvoided(patternKeyOf(x.id), answers))
+    .filter(x => !(ladderOf(x.id) && ladderAvoided(patternKeyOf(x.id), answers)))
     .sort((a, b) => (b.w - a.w) || (a.d - b.d))
   return scored.map(x => x.id)
 }
@@ -591,7 +605,7 @@ export function generatePlan(S, answersIn) {
   // say to program around is unreachable on purpose, and the same substitution machinery
   // that handles missing kit handles the cranky joint.
   const canTrain = pattern => !patternAvoided(pattern, answers)
-    && (rungsFor(S, pattern).length > 0 || !!loadedFor(S, pattern))
+    && ((!ladderAvoided(pattern, answers) && rungsFor(S, pattern).length > 0) || !!loadedFor(S, pattern))
 
   const seen = {}
   let usedHistory = 0
@@ -843,6 +857,7 @@ export function applyPlan(s, plan, { replace } = {}) {
   }
   s.routines.push(...plan.routines)
   Object.entries(plan.week).forEach(([d, id]) => { s.week[d] = id })
+  s.weekEdited = todayISO()
   // Rest between sets is part of the prescription, not a preference the plan should ignore.
   if (plan.report && plan.report.restSec) s.restSec = plan.report.restSec
 }

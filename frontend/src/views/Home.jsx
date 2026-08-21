@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { effectiveRoutine, effectiveRoutineId, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
@@ -59,6 +59,11 @@ export default function Home() {
   const lastWo = S.workouts.length ? S.workouts[S.workouts.length - 1].d : null
   const active14 = lastWo && new Date(yIso) - new Date(lastWo) < 14 * 86400000
   const missed = !S.active && missedR && active14 && !doneDays.has(yIso) && !routine && !doneDays.has(todayISO())
+
+  // Fingerprint keys, not references: the store clones S on every update, so keying on the
+  // arrays themselves would recompute for every food entry and weigh-in anyway.
+  const fatigueCard = useMemo(() => suggestEasyWeek(S),
+    [S.workouts.length, S.workouts[S.workouts.length - 1]?.d, S.routines.length, S.easyUntil, S.fatigueDismissed])
 
   const wThisWeek = S.workouts.filter(w => weekKey(w.d) === weekKey(todayISO())).length
   const plannedPerWeek = Object.keys(S.week).filter(k => S.week[k]).length
@@ -163,9 +168,11 @@ export default function Home() {
 
     {/* The log saying "you need a break" before anything visibly breaks: long streak,
         concurrent stalls, effort creeping toward failure (lib/fatigue.js). A suggestion
-        with a snooze — the engine prescribes numbers, people decide weeks. */}
+        with a snooze — the engine prescribes numbers, people decide weeks. Memoised on
+        cheap fingerprints: the store clones S on every update, so logging food must not
+        re-scan years of workouts for a card that only changes when training does. */}
     {(() => {
-      const f = suggestEasyWeek(S)
+      const f = fatigueCard
       if (!f.suggest) return null
       return <div className="card" style={{ borderColor: 'var(--indigo)' }}>
         <div className="row" style={{ gap: 9 }}>

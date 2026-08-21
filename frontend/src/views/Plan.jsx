@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
-import { DAYN, uid, exCount } from '../lib/format.js'
+import { DAYN, uid, exCount, todayISO } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 import { dayAssignSheet, loadStarterPlan, planToolsSheet, confirmSheet } from '../sheets.jsx'
 import { useUI } from '../store/useUI.js'
@@ -93,6 +93,7 @@ export default function Plan() {
       const va = s.week[a], vb = s.week[b]
       if (vb) s.week[a] = vb; else delete s.week[a]
       if (va) s.week[b] = va; else delete s.week[b]
+      s.weekEdited = todayISO()
     })
     setSwap(null)
     useUI.getState().toast(t('Swapped {0} and {1}', t(DAYN[a]), t(DAYN[b])))

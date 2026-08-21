@@ -140,6 +140,7 @@ function StarterPlans({ close }) {
     update(s => {
       s.routines.push(...routines)
       Object.entries(week).forEach(([d, id]) => { s.week[d] = id })
+      s.weekEdited = todayISO()
     })
     close()
     toast(t('“{0}” loaded — {1}', plan.name, plan.days))
@@ -1136,7 +1137,7 @@ export const dayOverrideSheet = iso => ui().openSheet(close => <DayOverride iso=
 
 function DayAssign({ day, close }) {
   const st = useStore(s => s.S)
-  const set = v => { update(s => { if (v) s.week[day] = v; else delete s.week[day] }); close() }
+  const set = v => { update(s => { if (v) s.week[day] = v; else delete s.week[day]; s.weekEdited = todayISO() }); close() }
   return <>
     <h3>{t(DAYN[day])}</h3>
     <div className="list">

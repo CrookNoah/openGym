@@ -27,7 +27,13 @@ export function missedPlanned(S, lookback = 3) {
   if (!workouts.length) return []
   const lastT = new Date(workouts[workouts.length - 1].d + 'T12:00:00').getTime()
   if (Date.now() - lastT > 14 * 86400000) return []
-  const firstT = new Date(workouts[0].d + 'T12:00:00').getTime()
+  // A schedule is only guilty for the weeks it existed. weekEdited is stamped whenever the
+  // week template changes; profiles from before the stamp fall back to the history's start,
+  // which at least protects imported histories with a brand-new plan on top.
+  const born = (S && S.weekEdited)
+    ? new Date(S.weekEdited + 'T12:00:00').getTime()
+    : new Date(workouts[0].d + 'T12:00:00').getTime()
+  const firstT = Math.max(born, new Date(workouts[0].d + 'T12:00:00').getTime())
   const done = new Set(workouts.map(w => w.d))
   const out = []
   for (let d = 0; d < 7; d++) {
@@ -126,11 +132,17 @@ export function repairFor(S, muscle) {
   const answers = (S && S.plannerAnswers) || DEFAULT_ANSWERS
   const all = fillersFor(S, muscle, answers)
   if (!all.length) return null
-  const already = new Set(routines.flatMap(r => r.ex.map(e => e.id)))
+  // "Already in the plan" means the *scheduled* plan: a filler sitting in an archived,
+  // unscheduled routine trains nothing this week and must not block the fix. And sessions
+  // have a ceiling here just as they do in the generator — repeated one-tap fixes must not
+  // quietly build a 14-exercise Tuesday.
+  const ROOM = 10
+  const already = new Set(trained.flatMap(r => r.ex.map(e => e.id)))
   const fresh = all.filter(id => !already.has(id))
-  const carrier = trained.find(r => r.ex.some(e => all.includes(e.id)))
-  if (fresh.length) {
-    const target = carrier || homeFor(muscle, trained)
+  const withRoom = trained.filter(r => r.ex.length < ROOM)
+  const carrier = withRoom.find(r => r.ex.some(e => all.includes(e.id)))
+  if (fresh.length && (carrier || withRoom.length)) {
+    const target = carrier || homeFor(muscle, withRoom)
     const cfg = accessoryCfg(S, fresh[0], target.ex.length, answers)
     if (cfg) return { kind: 'add', cfg, name: exOr(cfg.id).n, routine: target }
   }

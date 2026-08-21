@@ -138,6 +138,7 @@ export function mergePlan(s, bundle, { schedule } = {}) {
     Object.entries(bundle.week || {}).forEach(([d, oldId]) => {
       if (ridMap[oldId]) s.week[d] = ridMap[oldId]
     })
+    s.weekEdited = todayISO()
   }
   return { routines: bundle.routines.length }
 }

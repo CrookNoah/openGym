@@ -221,7 +221,10 @@ function PlanPreview({ answers, close }) {
           <span className="lrow-i"><Icon name={glyphOf(rt.emoji)} /></span>
           <div className="grow">
             <div className="tt">{rt.name}</div>
-            <div className="ss">{t('{0} exercises', rt.ex.length)} · {t('{0} sets', rt.ex.reduce((n, e) => n + e.sets, 0))} · {t('≈ {0} min', sessionMinutes(rt, st.restSec))}</div>
+            {/* Priced with the rest the PLAN will install (r.restSec), not the profile's current
+                setting — the strength goal prescribes 150 s rests, and quoting minutes at the
+                old 90 s would undersell every session by a third. */}
+            <div className="ss">{t('{0} exercises', rt.ex.length)} · {t('{0} sets', rt.ex.reduce((n, e) => n + e.sets, 0))} · {t('≈ {0} min', sessionMinutes(rt, r.restSec))}</div>
           </div>
           <Icon name={open === i ? 'chevronUp' : 'chevronDown'} className="chev" />
         </div>
