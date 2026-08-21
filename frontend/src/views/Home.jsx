@@ -9,6 +9,7 @@ import { addFoodSheet } from '../foodsheets.jsx'
 import { planWizardSheet } from '../planner.jsx'
 import { dayTotals, targetOf, MACROS, MACRO_NAME } from '../lib/food.js'
 import { easyWeekActive } from '../lib/progression.js'
+import { suggestEasyWeek, dismissEasyWeek } from '../lib/fatigue.js'
 import { routineMuscles } from '../lib/week.js'
 import { MUSCLE_NAME } from '../lib/muscles.js'
 import LineChart from '../components/LineChart.jsx'
@@ -159,6 +160,30 @@ export default function Home() {
         <div className="chart" style={{ marginTop: 8 }}><LineChart points={bwPoints} h={130} unit={S.unit} goal={S.targetW} /></div>
       </> : <div className="muted small">{t("No entries yet — log your weight to start the curve. It's also asked before every workout.")}</div>}
     </div>
+
+    {/* The log saying "you need a break" before anything visibly breaks: long streak,
+        concurrent stalls, effort creeping toward failure (lib/fatigue.js). A suggestion
+        with a snooze — the engine prescribes numbers, people decide weeks. */}
+    {(() => {
+      const f = suggestEasyWeek(S)
+      if (!f.suggest) return null
+      return <div className="card" style={{ borderColor: 'var(--indigo)' }}>
+        <div className="row" style={{ gap: 9 }}>
+          <span className="lrow-i" style={{ background: 'var(--indigo)' }}><Icon name="moon" /></span>
+          <div className="grow">
+            <div className="tt">{t('An easy week would land well')}</div>
+            <div className="ss">{f.reasons.map(r => t(...r)).join(' · ')}</div>
+          </div>
+        </div>
+        <div className="row" style={{ gap: 8, marginTop: 12 }}>
+          <Button variant="primary" size="sm" icon="moon" onClick={() => {
+            const end = new Date(); end.setDate(end.getDate() + 6)
+            update(s => { s.easyUntil = isoOf(end) })
+          }}>{t('Start easy week')}</Button>
+          <Button size="sm" onClick={() => update(s => dismissEasyWeek(s))}>{t('Not now')}</Button>
+        </div>
+      </div>
+    })()}
 
     {easyWeekActive(S) && <div className="card" style={{ borderColor: 'var(--indigo)' }}>
       <div className="row" style={{ gap: 9 }}>
