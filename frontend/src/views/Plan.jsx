@@ -7,7 +7,7 @@ import { planWizardSheet } from '../planner.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { glyphOf, DEFAULT_GLYPH } from '../lib/glyphs.js'
-import { weekAudit, adjacentOverlap } from '../lib/week.js'
+import { weekAudit, adjacentOverlap, sessionMinutes, routineMuscles } from '../lib/week.js'
 import { MUSCLE_NAME } from '../lib/muscles.js'
 import BodyMap, { BodyMapLegend } from '../components/BodyMap.jsx'
 
@@ -83,7 +83,11 @@ export default function Plan() {
       </div>
       {S.routines.length ? <div className="list">{S.routines.map(r => <div key={r.id} className="item" onClick={() => nav('/plan/r/' + r.id)}>
         <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
-        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
+        <div className="grow"><div className="tt">{r.name}</div>
+          {/* What it is, what it costs, what it hits — the three questions a routine row gets asked. */}
+          <div className="ss">{exCount(r.ex.length)}{r.ex.length ? ` · ${t('≈ {0} min', sessionMinutes(r, S.restSec))}` : ''}
+            {(() => { const m = routineMuscles(r, 3); return m.length ? ' · ' + m.map(x => t(MUSCLE_NAME[x])).join(', ') : '' })()}</div>
+        </div>
         <Icon name="chevronRight" className="chev" /></div>)}</div> : <>
         <div className="empty"><div className="ico"><Icon name="clipboard" /></div>{t('No routines yet.')}<br />{t('Let openGym build one, or start from scratch.')}</div>
         <Button variant="primary" icon="sparkles" onClick={planWizardSheet}>{t('Build me a plan')}</Button>

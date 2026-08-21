@@ -9,6 +9,28 @@
 
 import { MUSCLES, loadOfRoutine, rankOf, hardMusclesOf, sharedHard } from './muscles.js'
 import { weeklyLoad, thresholds, weekSlotCount } from './planner.js'
+import { modeOf } from './history.js'
+
+/**
+ * What a session costs in minutes, honestly approximate: each rep-set is ~3 s a rep
+ * (clamped 20–60 s — nobody's set of five takes fifteen seconds), a timed set is its
+ * prescribed hold, cardio is its own clock with no rest rows, and the profile's rest
+ * setting sits between every set but the last. A warm-up set counts as one more set.
+ * The wizard asks "about how long?" — this is the number that answers whether the plan
+ * it built actually keeps that promise.
+ */
+export function sessionMinutes(r, restSec = 90) {
+  const rest = Number(restSec) > 0 ? Number(restSec) : 90
+  let work = 0, sets = 0
+  ;(r?.ex || []).forEach(c => {
+    const n = (c.sets || 1) + (c.warmup ? 1 : 0)
+    const mode = modeOf(c)
+    if (mode === 'cardio') { work += n * (c.min || 20) * 60; return }
+    sets += n
+    work += n * (mode === 'time' ? (c.sec || 45) : Math.min(60, Math.max(20, (c.reps || 10) * 3)))
+  })
+  return Math.round((work + Math.max(0, sets - 1) * rest) / 60)
+}
 
 /** The muscles one routine trains, hardest-worked first — the chips on the today card. */
 export function routineMuscles(routine, n = 5) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { routineMuscles, weekAudit, adjacentOverlap } from './week.js'
+import { routineMuscles, weekAudit, adjacentOverlap, sessionMinutes } from './week.js'
 import { MUSCLES } from './muscles.js'
 import { generatePlan, DEFAULT_ANSWERS } from './planner.js'
 
@@ -93,5 +93,34 @@ describe('adjacentOverlap', () => {
     expect(warn.length).toBe(1)
     expect(warn[0].day).toBe(6)
     expect(warn[0].next).toBe(0)
+  })
+})
+
+describe('sessionMinutes', () => {
+  it('prices a rep session: work per set plus rest between sets', () => {
+    // 3 × 10 reps = 3 × 30 s work + 2 × 90 s rest = 270 s
+    expect(sessionMinutes({ ex: [{ id: '0662', sets: 3, reps: 10 }] }, 90)).toBe(5)
+  })
+
+  it('counts a warm-up set as one more set', () => {
+    // 4 sets' work + 3 rests = 390 s ≈ 7 min (vs 5 without)
+    expect(sessionMinutes({ ex: [{ id: '0662', sets: 3, reps: 10, warmup: true }] }, 90)).toBe(7)
+  })
+
+  it('prices holds by their prescribed time and cardio by its own clock', () => {
+    // 2 × 60 s hold + 1 × 90 s rest = 210 s
+    expect(sessionMinutes({ ex: [{ id: '3665', sets: 2, sec: 60, mode: 'time' }] }, 90)).toBe(4)
+    // 20 min of cardio adds no rest rows
+    expect(sessionMinutes({ ex: [{ id: '3220', sets: 1, min: 20, mode: 'cardio' }] }, 90)).toBe(20)
+  })
+
+  it('clamps a rep-set to something a human takes', () => {
+    // 5 reps is not a 15-second set: clamped to 20 s → 3×20 + 2×90 = 240 s
+    expect(sessionMinutes({ ex: [{ id: '0662', sets: 3, reps: 5 }] }, 90)).toBe(4)
+  })
+
+  it('is zero for an empty routine and survives nonsense', () => {
+    expect(sessionMinutes({ ex: [] })).toBe(0)
+    expect(sessionMinutes(null)).toBe(0)
   })
 })

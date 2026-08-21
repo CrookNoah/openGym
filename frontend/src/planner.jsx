@@ -14,6 +14,7 @@ import { DAYS } from './lib/format.js'
 import { exOr } from './lib/exercises.js'
 import { MUSCLE_NAME } from './lib/muscles.js'
 import { exLine } from './lib/history.js'
+import { sessionMinutes } from './lib/week.js'
 import {
   GOALS, LEVELS, INTENSITY, LENGTHS, DEFAULT_ANSWERS, MIN_DAYS, MAX_DAYS,
   generatePlan, applyPlan, splitName,
@@ -201,7 +202,7 @@ function PlanPreview({ answers, close }) {
           <span className="lrow-i"><Icon name={glyphOf(rt.emoji)} /></span>
           <div className="grow">
             <div className="tt">{rt.name}</div>
-            <div className="ss">{t('{0} exercises', rt.ex.length)} · {t('{0} sets', rt.ex.reduce((n, e) => n + e.sets, 0))}</div>
+            <div className="ss">{t('{0} exercises', rt.ex.length)} · {t('{0} sets', rt.ex.reduce((n, e) => n + e.sets, 0))} · {t('≈ {0} min', sessionMinutes(rt, st.restSec))}</div>
           </div>
           <Icon name={open === i ? 'chevronUp' : 'chevronDown'} className="chev" />
         </div>

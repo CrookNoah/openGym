@@ -5,6 +5,7 @@ import { exOr } from '../lib/exercises.js'
 import { uid } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 import { supersetUnits, cleanupSg, exLine } from '../lib/history.js'
+import { sessionMinutes } from '../lib/week.js'
 import { Thumb } from '../components/Media.jsx'
 import { glyphPicker, exercisePicker, exConfigSheet, confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
@@ -85,7 +86,7 @@ export default function RoutineEdit() {
       const load = loadOfRoutine(r)
       const { worked } = rankOf(load)
       return <div className="card" style={{ marginTop: 12 }}>
-        <h2>{t('What this session hits')}</h2>
+        <h2>{t('What this session hits')} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {t('≈ {0} min', sessionMinutes(r, S.restSec))}</span></h2>
         <BodyMap load={load} body={S.body} />
         <div className="mchips">
           {worked.slice(0, 6).map(m => <span key={m} className="mchip">{t(MUSCLE_NAME[m])}</span>)}
