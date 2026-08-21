@@ -236,10 +236,13 @@ describe('generatePlan', () => {
     expect(r.gapNames.length).toBeGreaterThan(0)
   })
 
-  it('turns the goal into a rep range', () => {
+  it('turns the goal into a rep range on the main pattern work', () => {
+    // Accessories deliberately run a notch higher whatever the goal says (see accessoryCfg),
+    // so the goal's range is asserted on movement-pattern slots only.
     GOALS.forEach(g => {
       const reps = generatePlan(FLOOR, A({ goal: g.key })).routines
-        .flatMap(r => r.ex).filter(e => modeOf(e) === 'reps' && !e.side)
+        .flatMap(r => r.ex).filter(e => modeOf(e) === 'reps' && !e.side && patternKeyOf(e.id))
+      expect(reps.length, g.key).toBeGreaterThan(0)
       reps.forEach(e => {
         expect(e.reps, g.key).toBeGreaterThanOrEqual(g.reps[0])
         expect(e.repsMax, g.key).toBeLessThanOrEqual(g.reps[1])
@@ -560,5 +563,31 @@ describe('the target effort rides on the routine', () => {
   it('stamps every routine with the RIR the plan was built around', () => {
     const { routines, report } = generatePlan(FLOOR, A({ intensity: 'hard' }))
     routines.forEach(r => expect(r.rir).toBe(report.rir))
+  })
+})
+
+describe('A/B variety and accessory ranges', () => {
+  it('gives the second session of a split its own emphasis', () => {
+    const { routines } = generatePlan(FLOOR, A({ days: 4 }))
+    const upperA = routines[0], upperB = routines[2]
+    expect(upperB.name).not.toBe(upperA.name)
+    // Not the same session with a different name: the exercise lists must differ somewhere.
+    expect(upperB.ex.map(e => e.id).join()).not.toBe(upperA.ex.map(e => e.id).join())
+  })
+
+  it('swaps in the alternative loaded lift on a B-day when the kit has one', () => {
+    const GYM2 = { routines: [], workouts: [], unit: 'lb' }
+    const { routines } = generatePlan(GYM2, A({ days: 4 }))
+    const pressA = routines[0].ex[0], pressB = routines[2].ex[0]
+    expect(pressA.id).not.toBe(pressB.id)
+  })
+
+  it('runs accessories a notch higher than a strength goal main lift', () => {
+    const GYM2 = { routines: [], workouts: [], unit: 'lb' }
+    const { routines } = generatePlan(GYM2, A({ goal: 'strength', days: 3, length: 'long' }))
+    const accessories = routines.flatMap(r => r.ex)
+      .filter(e => !patternKeyOf(e.id) && EXIDX[e.id].bp !== 'cardio' && e.mode === 'reps')
+    expect(accessories.length).toBeGreaterThan(0)
+    accessories.forEach(e => expect(e.reps, EXIDX[e.id].n).toBeGreaterThanOrEqual(10))
   })
 })

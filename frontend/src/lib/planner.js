@@ -215,13 +215,12 @@ export const LOADED = {
 }
 
 /** The loaded lift this profile should use for a pattern, or null to stay on the ladder. */
-export function loadedFor(S, pattern) {
-  const opts = LOADED[pattern] || []
-  for (const o of opts) {
-    if (o.unless && hasGear(S, o.unless)) continue
-    if (o.needs.every(k => hasGear(S, k)) && EXIDX[o.id]) return o.id
-  }
-  return null
+export function loadedFor(S, pattern, nth = 0) {
+  const opts = (LOADED[pattern] || []).filter(o =>
+    !(o.unless && hasGear(S, o.unless)) && o.needs.every(k => hasGear(S, k)) && EXIDX[o.id])
+  // nth picks the pattern's alternative lift for a B-session (bench on A, the next press on
+  // B) and falls back to the first when the kit only reaches one.
+  return (opts[nth] || opts[0] || {}).id || null
 }
 // pattern for a loaded id — the ladders don't know these ids, so the superset pairing needs
 // its own lookup.
@@ -282,11 +281,16 @@ function setsFor(slotIndex, answers) {
   return Math.max(2, Math.min(5, Math.round(base * mul)))
 }
 
-/** One configured exercise for one pattern, or null if the kit cannot reach that pattern. */
-export function buildSlot(S, pattern, slotIndex, answers, used) {
+/**
+ * One configured exercise for one pattern, or null if the kit cannot reach that pattern.
+ * `variant` is which repeat of this session type is being built (0 = A, 1 = B, …): a B-day
+ * leans on the pattern's alternative lift and the neighbouring rung, so Upper A and Upper B
+ * stop being the same session with a different name.
+ */
+export function buildSlot(S, pattern, slotIndex, answers, used, variant = 0) {
   // A loaded lift takes the slot when the kit exists: it progresses by weight, so it needs
   // no rep ceiling and no ladder — the plates are the ladder.
-  const loaded = loadedFor(S, pattern)
+  const loaded = loadedFor(S, pattern, variant)
   if (loaded && !(used && used.has(loaded))) {
     const g = goalOf(answers)
     const lex = EXIDX[loaded]
@@ -305,6 +309,13 @@ export function buildSlot(S, pattern, slotIndex, answers, used) {
   // bottom of the ladder, which is how a barbell lifter's second push slot became wall
   // push-ups: an extra slot is more of the same work, not a regression to day one.
   let id = first
+  // A repeat session shifts one rung over — up when the ladder allows it, down otherwise —
+  // which is the classic A/B intensity wave: the same pattern, a different emphasis, and two
+  // exercises whose progressions run independently.
+  if (variant > 0) {
+    const i = rungs.indexOf(id)
+    id = rungs[i + variant] || rungs[i - 1] || id
+  }
   if (used && used.has(id)) {
     const i = rungs.indexOf(id)
     id = rungs.find((r, j) => j > i && !used.has(r))
@@ -513,7 +524,9 @@ export function accessoryCfg(S, id, slotIndex, answers) {
   if (isHeldRung(id)) return { id, sets, sec: 30, secMax: 75, weight: 0, mode: 'time', prog: 'time' }
   const ex = EXIDX[id]
   const side = /one arm|single arm|one leg|single leg|lunge|split squat|side lying|side plank|per side/i.test(ex.n || '')
-  const [lo, hi] = g.reps
+  // Accessories run a notch higher than the main work whatever the goal's range says:
+  // five-rep curls is how elbows get angry, and isolation work earns its keep at 10–15.
+  const lo = Math.max(g.reps[0], 10), hi = Math.max(g.reps[1], 15)
   return {
     id, sets, weight: 0, mode: 'reps',
     reps: side ? Math.ceil(lo * 2 / 2) * 2 : lo,
@@ -564,7 +577,7 @@ export function generatePlan(S, answersIn) {
       if (ex.length >= slotCap) break
       const target = canTrain(pattern) ? pattern : SUBSTITUTE[pattern]
       if (!target || !canTrain(target)) continue
-      const cfg = buildSlot(S, target, ex.length, answers, used)
+      const cfg = buildSlot(S, target, ex.length, answers, used, seen[k] - 1)
       if (cfg) {
         if (historyRungFor(S, target) === cfg.id) usedHistory++
         used.add(cfg.id); ex.push(cfg)
