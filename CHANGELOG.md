@@ -1,5 +1,52 @@
 # Changelog
 
+## v2.2.0 — 2026-08-22 — the plan thinks ahead
+
+### The back gesture behaves
+
+- ⬅️ **Swiping back no longer closes the app.** It means what it means everywhere else on
+  the phone: the open sheet closes first, then the previous screen, and only from Home with
+  nothing open does it hand back to the OS — as a minimize, never an exit.
+
+### The generator gets sharper
+
+- 🧑‍🏫 **Sessions in coach order.** Pattern work first, accessories after, conditioning dead
+  last — no more burpees followed by calm scapula push-ups. And an extra slot from an
+  already-used pattern steps to the *nearest* rung, not the bottom of the ladder: a barbell
+  lifter's second press is more pressing, never wall push-ups.
+- 🅰️🅱️ **Repeat sessions get their own emphasis.** The six-day split's B-days take the
+  pattern's alternative lift (bench on A, the next press on B) or shift one rung over —
+  the classic A/B wave, each progression running independently.
+- 🔢 **Accessories run 10–15 reps** whatever the goal's range says — five-rep curls is how
+  elbows get angry. The goal's range still governs the main work.
+- 🦵 **"Anything to train around?"** Shoulders, knees, lower back, wrists — a ticked joint
+  is treated exactly like missing kit: the stressing pattern is substituted away, the
+  backfill respects it, and the preview says what was programmed around. Wrists are mapped
+  finely: the handstand line goes, a neutral-grip overhead press stays.
+
+### The plan screen works with you
+
+- 🔧 **The Week check fixes what it finds.** Tap a missed or light muscle and the
+  generator's own backfill is offered on demand — the right movement, configured, into the
+  right session, one confirm. When everything suitable is already in the week, it deepens
+  by a set instead of duplicating.
+- ⏱️ **Every session says what it costs.** Honest minute estimates on the wizard preview
+  (priced at the rest the plan will install), the Plan tab's routine rows, and the routine
+  editor.
+- ⇄ **Swap two days in two taps**, "Regenerate my plan" re-runs your saved answers with a
+  preview first, the rest-day reasoning lives under the schedule, and a weekday whose
+  session keeps not happening earns one tappable "keeps getting missed" line — judged only
+  for the weeks the schedule actually existed.
+
+### The log watches your fatigue
+
+- 🌙 **The easy week suggests itself.** Eight straight weeks of training, several exercises
+  stalling at once, or your effort ratings drifting toward failure — two signals together
+  and Home offers the deload with its reasons named, a Start button and a two-week snooze.
+  Resets properly after a completed easy week. A suggestion, never an action.
+
+All of it translated into the other eleven languages, as always.
+
 ## v2.1.0 — 2026-08-21 — the week made visible
 
 v2.0 built the engines; this release points them at the screens where the questions actually
