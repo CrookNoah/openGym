@@ -133,7 +133,9 @@ function deloadTo(cur, step) {
 export function readSession(entry, fallback) {
   const target = (entry && entry.target) || fallback || {}
   const mode = modeOf({ ...target, id: entry && entry.id })
-  const sets = (entry && entry.sets) || []
+  // Warm-up sets never count: they are half-effort by construction (lib/history.js), and a
+  // session judged with one in it would read as a miss every time.
+  const sets = ((entry && entry.sets) || []).filter(s => !s.wu)
   const planned = target.sets || sets.length
   const enough = sets.length >= planned
 
@@ -168,7 +170,7 @@ export function sessionsFor(S, exId, fallback) {
     // and is skipped outright: it is neither a hit nor a miss, and judging the week after
     // against it would either advance off a soft session or deload a lifter for resting.
     if (entry && entry.target && entry.target.easy) return
-    if (entry && entry.sets.some(s => s.done)) out.push({ d: w.d, ...readSession(entry, fallback) })
+    if (entry && entry.sets.some(s => s.done && !s.wu)) out.push({ d: w.d, ...readSession(entry, fallback) })
   })
   return out
 }

@@ -8,8 +8,8 @@ import { beep, vibrate } from './lib/sound.js'
 import { t, instrFor, getLang, INSTR_LANGS } from './lib/i18n.js'
 import { nav } from './lib/nav.js'
 import { STARTER_PLANS, buildPlan } from './lib/starter.js'
-import { GEAR, GEAR_NAME, gearChosen, hasGear, filterByGear, expandGear } from './lib/gear.js'
-import { ladderPos, isHeldRung, ladderOf } from './lib/ladders.js'
+import { GEAR, GEAR_NAME, gearChosen, hasGear, filterByGear, expandGear, gearOf } from './lib/gear.js'
+import { LADDERS, ladderPos, isHeldRung, ladderOf, prevRung } from './lib/ladders.js'
 import { proposeAdditions, applyAdditions } from './lib/kit.js'
 import Media, { Thumb } from './components/Media.jsx'
 import Stepper from './components/Stepper.jsx'
@@ -298,6 +298,50 @@ function MeasureSheet({ close }) {
   </>
 }
 export function measureSheet() { ui().openSheet(close => <MeasureSheet close={close} />) }
+
+/* ============================ the ladder, laid out ============================ */
+// Every rung of one movement pattern, easiest first — the road ahead made visible. The rungs
+// the kit cannot reach stay on the list, dimmed and named with what unlocks them, because
+// "a one-arm push-up is four steps away" is exactly the kind of thing worth training toward,
+// and hiding it turns a ladder into a dead end.
+function LadderSheet({ lkey, curId, close }) {
+  const st = useStore(s => s.S)
+  const l = LADDERS.find(x => x.key === lkey)
+  if (!l) return null
+  return <>
+    <h3>{t(l.name)} <span className="dim" style={{ fontWeight: 400 }}>· {t('the ladder')}</span></h3>
+    <div className="muted small" style={{ marginBottom: 12 }}>
+      {t('Easiest at the top, hardest at the bottom. Tap any step for its demo and instructions.')}
+    </div>
+    <div className="list">
+      {l.rungs.map((id, i) => {
+        const ex = EXIDX[id]
+        if (!ex) return null
+        const need = gearOf(ex)
+        const ok = hasGear(st, need)
+        const here = id === curId
+        return <div key={id} className="item" onClick={() => exerciseDetailSheet(ex)}
+          style={{ ...(ok ? {} : { opacity: 0.55 }), ...(here ? { borderColor: 'var(--acc)' } : {}) }}>
+          <Thumb ex={ex} />
+          <div className="grow">
+            <div className="tt capitalize">{ex.n}</div>
+            <div className="ss">
+              {t('Step {0} of {1}', i + 1, l.rungs.length)}
+              {isHeldRung(id) ? ' · ' + t('timed hold') : ''}
+              {!ok ? ' · ' + t('needs {0}', t(GEAR_NAME[need] || need)) : ''}
+            </div>
+          </div>
+          {here && <span className="tag acc">{t('You are here')}</span>}
+          <Icon name="chevronRight" className="chev" />
+        </div>
+      })}
+    </div>
+    <div className="small dim" style={{ marginTop: 10, lineHeight: 1.45 }}>
+      {t('You never have to pick from here — top out a variation and openGym offers the next one by itself.')}
+    </div>
+  </>
+}
+export function ladderSheet(lkey, curId) { ui().openSheet(close => <LadderSheet lkey={lkey} curId={curId} close={close} />) }
 
 /* ============================ import from another app ============================ */
 // Shows what a parsed export would actually do before anything is written. An import is
@@ -682,7 +726,7 @@ function ExConfig({ ex, existing, onSave, onDelete, close, routine }) {
     if (cardio) onSave({ sets, min: Math.max(1, Math.round(c.min) || 20), speed: Math.max(0, c.speed || 8) })
     else if (mode === 'time') {
       const sec = Math.max(1, Math.round(c.sec) || 45)
-      const out = { sets, mode: 'time', sec, weight: Math.max(0, c.weight || 0), ...flags, ...prog }
+      const out = { sets, mode: 'time', sec, weight: Math.max(0, c.weight || 0), ...flags, ...(c.warmup ? { warmup: true } : {}), ...prog }
       // A ceiling below the working duration would tell you to change variation on day one.
       if (bw && !(out.weight > 0) && c.secMax > 0) out.secMax = Math.max(sec, Math.round(c.secMax))
       onSave(out)
@@ -692,7 +736,7 @@ function ExConfig({ ex, existing, onSave, onDelete, close, routine }) {
       // otherwise plan seven reps on one side and eight on the other, every session.
       const typed = Math.max(1, Math.round(c.reps) || 10)
       const reps = perSide ? Math.ceil(typed / 2) * 2 : typed
-      const out = { sets, mode: 'reps', reps, weight: Math.max(0, c.weight || 0), ...flags, ...(perSide ? { side: true } : {}), ...prog }
+      const out = { sets, mode: 'reps', reps, weight: Math.max(0, c.weight || 0), ...flags, ...(perSide ? { side: true } : {}), ...(c.warmup ? { warmup: true } : {}), ...prog }
       if (policyFor({ ...c, id: ex.id }, routine, 'reps') === 'double') out.repsMin = Math.min(reps, Math.max(1, Math.round(c.repsMin) || Math.max(1, reps - 2)))
       // A ceiling below the working reps would tell you to add a set on day one.
       if (bw && !(out.weight > 0) && c.repsMax > 0) out.repsMax = Math.max(reps, Math.round(c.repsMax))
@@ -743,6 +787,12 @@ function ExConfig({ ex, existing, onSave, onDelete, close, routine }) {
             total is a rep one side does not get. */}
         <Switch checked={perSide} onChange={v => setC(x => ({ ...x, side: v || undefined, reps: v ? Math.ceil((x.reps || 0) / 2) * 2 : x.reps }))} />
       </Row>}
+      <Row icon="flame" iconTint="var(--orange)" title={t('Warm-up set')}
+        subtitle={c.warmup
+          ? t('One half-effort set first, marked W. It never counts toward progression.')
+          : t('Start with one lighter set of the same movement.')}>
+        <Switch checked={!!c.warmup} onChange={v => setC(x => ({ ...x, warmup: v || undefined }))} />
+      </Row>
     </div>}
     {/* A stepper is too wide to sit in a list row next to a label — it squeezes the text to
         one word per line — so added weight gets the same full-width treatment as sets and
@@ -879,6 +929,71 @@ function LevelChange({ entryIdx, close }) {
   </>
 }
 export const levelChangeSheet = entryIdx => ui().openSheet(close => <LevelChange entryIdx={entryIdx} close={close} />)
+
+// "Too hard today?" — the in-the-moment version of dropping a rung. LevelChange above is the
+// engine's verdict after repeated stalls and rewrites the routine; this is the user's own call
+// on a bad day, so it swaps the *session* only. The plan and the history are untouched — next
+// time opens on the planned variation again, and the progression engine never learns the word
+// "bad day" from it.
+function DropBackToday({ entryIdx, close }) {
+  const st = useStore(s => s.S)
+  const A = st.active
+  const entry = A ? A.entries[entryIdx] : null
+  const prevId = entry ? prevRung(st, entry.id) : null
+  useEffect(() => { if (!entry || !prevId) close() }, [!entry])
+  if (!entry || !prevId) return null
+  const from = exOr(entry.id)
+  const to = exOr(prevId)
+  const target = entry.target || {}
+
+  const apply = () => {
+    const mode = isHeldRung(prevId) ? 'time' : (modeOf({ ...target, id: entry.id }) === 'time' ? 'time' : 'reps')
+    const base = defaultConfig(prevId, mode)
+    // Same sets, same targets, easier lever — the point of dropping back is finishing the
+    // prescription, not shrinking it.
+    const cfg = { ...base, id: prevId, sets: Math.max(1, target.sets || base.sets) }
+    if (mode === 'time') {
+      cfg.prog = 'time'
+      cfg.sec = target.sec || base.sec
+      if (target.secMax > 0) cfg.secMax = target.secMax
+    } else {
+      cfg.reps = target.reps || base.reps
+      if (target.repsMax > 0) cfg.repsMax = target.repsMax
+      if (target.side) cfg.side = true
+    }
+    update(s => {
+      const cur = s.active.entries[entryIdx]
+      s.active.entries[entryIdx] = {
+        id: prevId, sg: cur.sg, target: { ...cfg },
+        plan: { policy: cfg.prog || 'double', kind: 'first', why: ['Dropped back for today — the plan itself is unchanged.'] },
+        sets: buildSets(s, cfg),
+      }
+      // Deliberately NOT carried into the routine — that is what makes it "for today".
+    })
+    close()
+    toast(t('{0} today — the plan still says {1}.', to.n, from.n))
+  }
+
+  return <>
+    <h3 className="row" style={{ gap: 8 }}>
+      <Icon name="arrowDown" style={{ color: 'var(--orange)' }} />{t('Too hard today?')}
+    </h3>
+    <div className="muted small" style={{ marginBottom: 12, lineHeight: 1.5 }}>
+      {t('Swap in the easier variation for this session only. Your plan and your history stay as they are — next time opens on {0} again.', from.n)}
+    </div>
+    <div className="row between" style={{ marginBottom: 10, gap: 10 }}>
+      <span className="tag capitalize">{from.n}</span>
+      <Icon name="arrowDown" className="dim" />
+      <span className="tag acc capitalize">{to.n}</span>
+    </div>
+    <Media ex={to} />
+    <div style={{ height: 12 }} />
+    <Button variant="primary" onClick={apply}>{t('Use {0} today', to.n)}</Button>
+    <div style={{ height: 8 }} />
+    <Button variant="ghost" className="dim" onClick={close}>{t('Stay on {0}', from.n)}</Button>
+  </>
+}
+export const dropBackTodaySheet = entryIdx => ui().openSheet(close => <DropBackToday entryIdx={entryIdx} close={close} />)
 
 /* ============================ glyph picker ============================ */
 // Grouped by what the glyph means for a training day, so picking one is a scan

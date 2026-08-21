@@ -5,7 +5,7 @@ import { EXIDX } from '../lib/exercises.js'
 import { lastBW, streakWeeks, setLabel, modeOf, effortOf, bestWeightFor } from '../lib/history.js'
 import { fmtNum, fmtDate, fmtVol, todayISO, weekKey } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
-import { bwSheet, goalSheet, calendarSheet, workoutDetailSheet, WorkoutRow, bwDeltaColor, measureSheet } from '../sheets.jsx'
+import { bwSheet, goalSheet, calendarSheet, workoutDetailSheet, WorkoutRow, bwDeltaColor, measureSheet, ladderSheet } from '../sheets.jsx'
 import LineChart from '../components/LineChart.jsx'
 import Heatmap from '../components/Heatmap.jsx'
 import Icon from '../components/Icon.jsx'
@@ -179,16 +179,20 @@ function LaddersCard({ S }) {
   if (!prog.length) return null
   return <div className="card">
     <h2>{t('Ladders')} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {t('harder variations, not heavier weights')}</span></h2>
-    {prog.map(p => <div key={p.key} style={{ padding: '7px 0', borderBottom: 'var(--hair) solid var(--sep)' }}>
+    {prog.map(p => <div key={p.key} className="tappable" style={{ padding: '7px 0', borderBottom: 'var(--hair) solid var(--sep)', cursor: 'pointer' }}
+      onClick={() => ladderSheet(p.key, p.id)}>
       <div className="row between small" style={{ marginBottom: 5 }}>
         <span style={{ fontWeight: 500 }}>{t(p.name)}</span>
         <span className="dim">{p.atTop ? t('top of the ladder') : t('step {0} of {1}', p.step, p.total)}</span>
       </div>
       <div className="wprog"><i style={{ width: Math.round(p.step / Math.max(1, p.total) * 100) + '%', background: p.atTop ? 'var(--yellow)' : undefined }} /></div>
-      <div className="small dim" style={{ marginTop: 4 }}>{rungName(p.id)}</div>
+      <div className="row between small" style={{ marginTop: 4 }}>
+        <span className="dim">{rungName(p.id)}</span>
+        <Icon name="chevronRight" className="chev" style={{ fontSize: 12 }} />
+      </div>
     </div>)}
     <div className="small dim" style={{ marginTop: 10 }}>
-      {t('Each bar is a movement pattern, easiest variation to hardest. Top out on one and the progression engine starts offering added weight instead.')}
+      {t('Each bar is a movement pattern, easiest variation to hardest — tap one to see the whole road. Top out on one and the progression engine starts offering added weight instead.')}
     </div>
   </div>
 }

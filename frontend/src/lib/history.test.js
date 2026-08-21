@@ -513,3 +513,57 @@ describe('bestRepsFor and bestHoldFor', () => {
     expect(bestHoldFor({ workouts: [] }, '3665')).toBe(0)
   })
 })
+
+describe('warm-up sets', () => {
+  const emptyS = { workouts: [], exWeights: {} }
+
+  it('prepends a half-weight, full-reps warm-up on a loaded lift', () => {
+    const sets = buildSets(emptyS, { id: LIFT, sets: 3, reps: 8, weight: 100, mode: 'reps', warmup: true })
+    expect(sets.length).toBe(4)
+    expect(sets[0]).toEqual({ w: 50, r: 8, done: false, wu: true })
+    expect(sets.slice(1).every(s => !s.wu && s.w === 100 && s.r === 8)).toBe(true)
+  })
+
+  it('prepends a half-reps warm-up on bodyweight, where there is no weight to halve', () => {
+    const sets = buildSets(emptyS, { id: BW, sets: 3, reps: 10, weight: 0, mode: 'reps', bodyweight: true, warmup: true })
+    expect(sets[0]).toEqual({ w: 0, r: 5, done: false, wu: true })
+    expect(sets.length).toBe(4)
+  })
+
+  it('keeps a per-side warm-up total even', () => {
+    const sets = buildSets(emptyS, { id: BW, sets: 3, reps: 14, weight: 0, mode: 'reps', bodyweight: true, side: true, warmup: true })
+    expect(sets[0].wu).toBe(true)
+    expect(sets[0].r % 2).toBe(0)
+  })
+
+  it('halves the hold for a timed warm-up, snapped to 5s and never under 10', () => {
+    expect(buildSets(emptyS, { id: BW, sets: 2, sec: 60, mode: 'time', warmup: true })[0])
+      .toEqual({ sec: 30, w: 0, done: false, wu: true })
+    expect(buildSets(emptyS, { id: BW, sets: 2, sec: 15, mode: 'time', warmup: true })[0].sec).toBe(10)
+  })
+
+  it('gives cardio no warm-up set — its first minutes are the warm-up', () => {
+    const sets = buildSets(emptyS, { id: CARDIO, sets: 2, min: 20, speed: 8, warmup: true })
+    expect(sets.every(s => !s.wu)).toBe(true)
+  })
+
+  it('labels a warm-up set with the W shorthand', () => {
+    expect(setLabel(LIFT, { w: 50, r: 8, wu: true }, { id: LIFT, mode: 'reps' })).toBe('W 50×8')
+    expect(setLabel(BW, { sec: 30, wu: true }, { id: BW, mode: 'time' })).toBe('W 0:30')
+  })
+
+  it('shows the warm-up in the planned line', () => {
+    expect(exLine({ id: LIFT, sets: 3, reps: 10, weight: 60, warmup: true }, 'kg')).toBe('W + 3 × 10 · 60 kg')
+  })
+
+  it('never seeds the next session from a warm-up set', async () => {
+    const { lastEntryFor } = await import('./history.js')
+    const S = { workouts: [{ d: '2026-08-01', entries: [{ id: LIFT, sets: [
+      { w: 50, r: 8, done: true, wu: true },
+      { w: 100, r: 8, done: true },
+    ], target: { sets: 1, reps: 8, weight: 100, mode: 'reps' } }] }], exWeights: {} }
+    const last = lastEntryFor(S, LIFT)
+    expect(last.sets.length).toBe(1)
+    expect(last.sets[0].w).toBe(100)
+  })
+})

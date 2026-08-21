@@ -9,7 +9,8 @@ import { beep, vibrate } from '../lib/sound.js'
 import { t } from '../lib/i18n.js'
 import { api } from '../lib/api.js'
 import Media from '../components/Media.jsx'
-import { startFlow, exercisePicker, exConfigSheet, exerciseDetailSheet, topWeightSheet, finishWorkout, workoutCompleteSheet, confirmSheet, levelChangeSheet } from '../sheets.jsx'
+import { startFlow, exercisePicker, exConfigSheet, exerciseDetailSheet, topWeightSheet, finishWorkout, workoutCompleteSheet, confirmSheet, levelChangeSheet, dropBackTodaySheet } from '../sheets.jsx'
+import { prevRung } from '../lib/ladders.js'
 import Icon from '../components/Icon.jsx'
 import { Button, Check, NumberField } from '../components/ui.jsx'
 import { nextPrescription, applyPrescription } from '../lib/progression.js'
@@ -123,6 +124,12 @@ function ExerciseBlock({ entryIdx, compact, planRir, onToggle, onField, onAddSet
       {(ex.tg || ex.bp) && <span className="tag">{t(ex.tg || ex.bp)}</span>}
       {ex.eq && <span className="tag">{t(ex.eq)}</span>}
       {best > 0 && <span className="tag nocap">{t('Best:')} {fmtNum(best)} {S.unit}</span>}
+      {/* A bad day's exit, offered quietly: swap to the easier rung for this session only.
+          Gone once a set is logged — half a session of each movement helps nobody. */}
+      {!cardio && !entry.sets.some(s => s.done) && prevRung(S, entry.id) &&
+        <button className="tag nocap tappable" style={{ cursor: 'pointer' }} onClick={() => dropBackTodaySheet(entryIdx)}>
+          <Icon name="arrowDown" />{t('Too hard today?')}
+        </button>}
     </div>
     {last && <div className="small dim" style={{ marginBottom: 4 }}>{t('Last time')} ({fmtDate(last.d)}): {last.sets.map(s => setLabel(entry.id, s, last.target)).join(', ')}</div>}
     {/* Auto-regulation, displayed rather than imposed: when the logged effort says last time
@@ -153,10 +160,15 @@ function ExerciseBlock({ entryIdx, compact, planRir, onToggle, onField, onAddSet
       {/* the header carries the same eff3 sizing as the rows, or the labels drift off their columns */}
       <div className={'sethead' + (col3 ? ' eff3' : '')}><span className="n-sp" /><span className="w-sp">{col1.hd}</span>{col2 && <span className="r-sp">{col2.hd}</span>}{col3 && <span className="eff-sp">{col3.hd}</span>}{timed && <span className="ck-sp" />}<span className="ck-sp" /></div>
       {entry.sets.map((s, i) => <div key={i} className={'setrow' + (s.done ? ' done' : '') + (col3 ? ' eff3' : '')}>
-        <div className="n">{i + 1}</div>
+        {/* Warm-up rows read "W" and working sets keep counting 1, 2, 3 — a warm-up is not
+            set one of the workout, and it takes no effort rating (rating a warm-up would
+            pollute every effort average with sets that are easy on purpose). */}
+        <div className="n" style={s.wu ? { color: 'var(--orange)', fontWeight: 600 } : undefined}>
+          {s.wu ? 'W' : entry.sets.slice(0, i).filter(x => !x.wu).length + 1}
+        </div>
         {cell(s, i, col1, 'w')}
         {col2 && cell(s, i, col2, 'r')}
-        {col3 && cell(s, i, col3, 'eff')}
+        {col3 && (s.wu ? <div className="stp eff" style={{ visibility: 'hidden' }} /> : cell(s, i, col3, 'eff'))}
         {/* A timed set is started, not typed: the timer counts the hold down and checks the
             set off itself. The checkbox stays for anyone who timed it on their own watch. */}
         {timed && <button className="setgo" aria-label={t('Start set')} disabled={s.done || !!working}

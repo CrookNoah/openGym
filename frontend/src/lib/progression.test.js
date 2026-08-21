@@ -627,3 +627,24 @@ describe('easy week', () => {
     expect(p.weight).toBeGreaterThan(60)
   })
 })
+
+describe('warm-up sets and progression', () => {
+  const T = { sets: 3, reps: 5, weight: 60, mode: 'reps' }
+
+  it('judges working sets only — a half-effort warm-up is not a miss', () => {
+    const s = readSession({ id: LIFT, target: T, sets: [
+      { w: 30, r: 5, done: true, wu: true },      // half weight, on purpose
+      { w: 60, r: 5, done: true }, { w: 60, r: 5, done: true }, { w: 60, r: 5, done: true },
+    ] })
+    expect(s.ok).toBe(true)
+    expect(s.weight).toBe(60)
+  })
+
+  it('skips a session where only the warm-up got done', () => {
+    const S = { unit: 'kg', workouts: [{ d: '2026-08-01', entries: [{ id: LIFT, target: T, sets: [
+      { w: 30, r: 5, done: true, wu: true },
+      { w: 60, r: 0, done: false },
+    ] }] }] }
+    expect(sessionsFor(S, LIFT, T)).toEqual([])
+  })
+})

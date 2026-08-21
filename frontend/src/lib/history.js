@@ -94,8 +94,11 @@ const effortTail = s => {
 export function setLabel(id, s, cfg) {
   const c = cfg || { id }
   const mode = modeOf(c)
+  // "W" is the gym-standard shorthand for a warm-up set — an estimate of effort, not of
+  // language, so it is not translated.
+  const wu = s.wu ? 'W ' : ''
   if (mode === 'cardio') return `${s.min || 0} min @ ${fmtNum(s.speed || 0)} km/h`
-  if (mode === 'time') return fmtSec(s.sec) + (s.w > 0 ? ` · ${fmtNum(s.w)}` : '')
+  if (mode === 'time') return wu + fmtSec(s.sec) + (s.w > 0 ? ` · ${fmtNum(s.w)}` : '')
   // Bodyweight reads as what you did — "12", or "+10 × 12" once there is a belt involved —
   // rather than "0×12", which says a set was performed with no weight and means nothing.
   // A per-side set needs no mark here: the number logged is the total, the same as every
@@ -103,9 +106,9 @@ export function setLabel(id, s, cfg) {
   const reps = s.r || 0
   if (isBw({ ...c, id: c.id ?? id })) {
     const load = s.w > 0 ? `+${fmtNum(s.w)} × ` : ''
-    return `${load}${reps}` + effortTail(s)
+    return `${wu}${load}${reps}` + effortTail(s)
   }
-  return `${fmtNum(s.w || 0)}×${reps}` + effortTail(s)
+  return `${wu}${fmtNum(s.w || 0)}×${reps}` + effortTail(s)
 }
 // Default config for a freshly added exercise.
 export function defaultConfig(id, mode) {
@@ -122,13 +125,15 @@ export function defaultConfig(id, mode) {
 export function exLine(cfg, unit) {
   const mode = modeOf(cfg)
   const n = cfg.sets || 1
+  // A warm-up set rides ahead of the working sets: "W + 3 × 10".
+  const wu = cfg.warmup && mode !== 'cardio' ? 'W + ' : ''
   // Added weight reads as added: "+10 kg" on a dip belt, "60 kg" on a barbell.
   const load = cfg.weight ? ' · ' + (isBw(cfg) ? '+' : '') + fmtNum(cfg.weight) + ' ' + unit : ''
   if (mode === 'cardio') return `${n} × ${cfg.min || 20} min @ ${fmtNum(cfg.speed || 8)} km/h`
-  if (mode === 'time') return `${n} × ${fmtSec(cfg.sec || 45)}${load}`
+  if (mode === 'time') return `${wu}${n} × ${fmtSec(cfg.sec || 45)}${load}`
   // This is the line with room for it, so the split is spelled out: "3 × 16 · 8/side".
   const split = isPerSide(cfg) ? ' · ' + t('{0}/side', fmtNum(sideReps(cfg.reps))) : ''
-  return `${n} × ${cfg.reps}${load}${split}`
+  return `${wu}${n} × ${cfg.reps}${load}${split}`
 }
 
 // Drop superset ids that no longer have an adjacent partner (after unlink/reorder/remove).
@@ -144,7 +149,10 @@ export function lastEntryFor(S, exId) {
     // `target` is what the session prescribed; finished workouts carry it so labels and the
     // progression engine can read a session back the way it was logged. Older workouts have
     // none — modeOf() falls back to the body part for them, which is what they were.
-    if (en && en.sets.some(s => s.done)) return { d: S.workouts[i].d, sets: en.sets.filter(s => s.done), target: en.target || null }
+    // Warm-up sets (wu) are excluded on the way out: they are half-effort by construction,
+    // and everything this feeds — next session's seeds, the "last time" line, progression —
+    // is asking about working sets.
+    if (en && en.sets.some(s => s.done && !s.wu)) return { d: S.workouts[i].d, sets: en.sets.filter(s => s.done && !s.wu), target: en.target || null }
   }
   return null
 }
@@ -187,6 +195,25 @@ export function effectiveRoutine(S, iso) {
   const id = effectiveRoutineId(S, iso)
   return id ? S.routines.find(r => r.id === id) || null : null
 }
+// The warm-up set an exercise asked for (cfg.warmup): the same movement at half effort,
+// prepended and marked `wu` so nothing downstream mistakes it for a working set — the
+// progression engine judges working sets only (readSession) and next session seeds from
+// working sets only (lastEntryFor). Loaded work halves the weight and keeps the reps;
+// bodyweight has no weight to halve, so it halves the reps instead. Cardio gets none —
+// its first minutes are the warm-up.
+function withWarmup(cfg, sets, mode) {
+  if (!cfg.warmup || !sets.length || mode === 'cardio') return sets
+  if (mode === 'time') {
+    const sec = Math.max(10, Math.round((sets[0].sec || 30) / 2 / 5) * 5)
+    return [{ sec, w: 0, done: false, wu: true }, ...sets]
+  }
+  const first = sets[0]
+  const loaded = first.w > 0
+  let r = loaded ? (first.r || cfg.reps || 8) : Math.max(1, Math.ceil((first.r || cfg.reps || 8) / 2))
+  if (isPerSide(cfg)) r = Math.ceil(r / 2) * 2       // a per-side total stays even, warm-up included
+  return [{ w: loaded ? Math.round(first.w / 2) : 0, r, done: false, wu: true }, ...sets]
+}
+
 export function buildSets(S, cfg) {
   const last = lastEntryFor(S, cfg.id)
   const n = Math.max(1, cfg.sets || 1)
@@ -210,7 +237,7 @@ export function buildSets(S, cfg) {
       const carried = prev && prev.sec > 0 ? prev : null
       sets.push({ sec: carried ? carried.sec : (cfg.sec || 45), w: carried ? (carried.w || 0) : (cfg.weight || 0), done: false })
     }
-    return sets
+    return withWarmup(cfg, sets, 'time')
   }
   const conf = S.exWeights[cfg.id]
   for (let i = 0; i < n; i++) {
@@ -219,7 +246,7 @@ export function buildSets(S, cfg) {
     const w = conf && conf.w > 0 ? conf.w : (usable ? usable.w : cfg.weight)
     sets.push({ w, r: usable ? usable.r : cfg.reps, done: false })
   }
-  return sets
+  return withWarmup(cfg, sets, 'reps')
 }
 /* ---- how much of you a bodyweight movement actually lifts ----
    Volume is weight × reps, and a push-up logs no weight, so a floor-only session came out
