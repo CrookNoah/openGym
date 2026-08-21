@@ -64,6 +64,30 @@ export const LENGTHS = [
   { key: 'long', name: 'An hour or more', slots: 8 },
 ]
 
+// Joints to program around. Not medical advice and the wizard never pretends it is — it is
+// the substitution the app already does for missing kit, pointed at a cranky joint instead:
+// the pattern that stresses it is skipped and the nearest pattern trains the same muscles.
+// Mapped at the movement-pattern level, conservatively — filtering half the library "to be
+// safe" produces a plan nobody follows, which protects nothing.
+export const AVOID = [
+  { key: 'shoulder', name: 'Shoulders', hint: 'Skips dips and overhead pressing.' },
+  { key: 'knee', name: 'Knees', hint: 'Skips deep squatting and lunging.' },
+  { key: 'lowback', name: 'Lower back', hint: 'Skips hip hinging.' },
+  { key: 'wrist', name: 'Wrists', hint: 'Skips handstand-line work on loaded wrists.' },
+]
+const PATTERN_JOINTS = {
+  vpush: ['shoulder', 'wrist'],
+  dip: ['shoulder'],
+  squat: ['knee'],
+  hinge: ['lowback'],
+}
+const avoidSet = a => new Set(Array.isArray(a && a.avoid) ? a.avoid : [])
+/** Is this movement pattern off the table for these answers? */
+export const patternAvoided = (pattern, answers) => {
+  const av = avoidSet(answers)
+  return !!(PATTERN_JOINTS[pattern] || []).some(j => av.has(j))
+}
+
 export const DEFAULT_ANSWERS = { goal: 'muscle', level: 'some', intensity: 'normal', length: 'medium', days: 3 }
 
 const byKey = (list, key) => list.find(x => x.key === key) || list[0]
@@ -475,6 +499,9 @@ export function fillersFor(S, muscle, answers) {
   const scored = candidatePool(S)
     .map(id => ({ id, w: (loadOf([{ id, sets: 1 }])[muscle] || 0), d: at[id] ?? 0 }))
     .filter(x => x.w > 0)
+    // A filler from a pattern the answers avoid would smuggle the joint stress back in
+    // through the coverage door.
+    .filter(x => !patternAvoided(patternKeyOf(x.id), answers))
     .sort((a, b) => (b.w - a.w) || (a.d - b.d))
   return scored.map(x => x.id)
 }
@@ -560,8 +587,11 @@ export function generatePlan(S, answersIn) {
   const inten = intensityOf(answers)
   const rirTarget = Math.max(0, Math.min(4, g.rir + inten.rirAdj))
   // A pattern is reachable through its ladder OR through a loaded lift — a machines-only
-  // profile has no pull-up ladder but very much has a lat pulldown.
-  const canTrain = pattern => rungsFor(S, pattern).length > 0 || !!loadedFor(S, pattern)
+  // profile has no pull-up ladder but very much has a lat pulldown. A pattern the answers
+  // say to program around is unreachable on purpose, and the same substitution machinery
+  // that handles missing kit handles the cranky joint.
+  const canTrain = pattern => !patternAvoided(pattern, answers)
+    && (rungsFor(S, pattern).length > 0 || !!loadedFor(S, pattern))
 
   const seen = {}
   let usedHistory = 0
@@ -795,6 +825,8 @@ export function generatePlan(S, answersIn) {
       // How the week was placed and dressed — everything the preview needs to explain itself.
       pickedDays: !!avail,
       daysClamped,
+      // What was programmed around, by name — the preview owes the user the sentence.
+      avoidedNames: AVOID.filter(a => avoidSet(answers).has(a.key)).map(a => a.name),
       fromHistory: usedHistory,
       loadedCount: routines.reduce((n, r) => n + r.ex.filter(e => !!LOADED_PATTERN[e.id]).length, 0),
       supersets,

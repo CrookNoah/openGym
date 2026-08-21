@@ -591,3 +591,28 @@ describe('A/B variety and accessory ranges', () => {
     accessories.forEach(e => expect(e.reps, EXIDX[e.id].n).toBeGreaterThanOrEqual(10))
   })
 })
+
+describe('anything to train around', () => {
+  const GYM2 = { routines: [], workouts: [], unit: 'lb' }
+
+  it('keeps the avoided pattern out of the whole plan, backfill included', () => {
+    ;[['shoulder', ['vpush', 'dip']], ['knee', ['squat']], ['lowback', ['hinge']]].forEach(([joint, patterns]) => {
+      const { routines, report } = generatePlan(GYM2, A({ days: 4, length: 'long', avoid: [joint] }))
+      routines.flatMap(r => r.ex).forEach(e => {
+        expect(patterns, `${joint}: ${EXIDX[e.id].n}`).not.toContain(patternKeyOf(e.id))
+      })
+      expect(report.avoidedNames.length).toBe(1)
+    })
+  })
+
+  it('substitutes rather than thinning the session', () => {
+    const { routines } = generatePlan(GYM2, A({ days: 3, avoid: ['knee', 'shoulder'] }))
+    routines.forEach(r => expect(r.ex.length, r.name).toBeGreaterThanOrEqual(3))
+  })
+
+  it('changes nothing when nothing is ticked', () => {
+    const a = generatePlan(GYM2, A({ days: 3 }))
+    const b = generatePlan(GYM2, A({ days: 3, avoid: [] }))
+    expect(a.routines.map(r => r.ex.map(e => e.id))).toEqual(b.routines.map(r => r.ex.map(e => e.id)))
+  })
+})

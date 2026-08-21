@@ -16,7 +16,7 @@ import { MUSCLE_NAME } from './lib/muscles.js'
 import { exLine } from './lib/history.js'
 import { sessionMinutes } from './lib/week.js'
 import {
-  GOALS, LEVELS, INTENSITY, LENGTHS, DEFAULT_ANSWERS, MIN_DAYS, MAX_DAYS,
+  GOALS, LEVELS, INTENSITY, LENGTHS, AVOID, DEFAULT_ANSWERS, MIN_DAYS, MAX_DAYS,
   generatePlan, applyPlan, splitName,
 } from './lib/planner.js'
 import { gearSummary, gearChosen } from './lib/gear.js'
@@ -90,6 +90,24 @@ function PlanWizard({ close }) {
           ? t('Only {0} days ticked — the plan will train those and drop to a {1} split.', a.availableDays.length, splitName(a.availableDays.length))
           : t('Sessions go on the ticked days, spread as far apart as they allow.'))
         : t('None ticked — any day works, and openGym spaces the week itself.')}
+    </div>
+
+    {/* Not medical advice and it never pretends to be: the same substitution the generator
+        does for missing kit, pointed at a cranky joint. Nothing ticked is the normal case. */}
+    <div className="sect-t" style={{ padding: '0 2px 7px' }}>{t('Anything to train around?')}</div>
+    <div className="chips" style={{ marginBottom: 6 }}>
+      {AVOID.map(j => {
+        const on = (a.avoid || []).includes(j.key)
+        return <button key={j.key} className={'chip' + (on ? ' on' : '')} onClick={() => {
+          const cur = a.avoid || []
+          set('avoid', on ? cur.filter(x => x !== j.key) : [...cur, j.key])
+        }}>{t(j.name)}</button>
+      })}
+    </div>
+    <div className="small dim" style={{ marginBottom: 14, lineHeight: 1.4 }}>
+      {(a.avoid || []).length
+        ? AVOID.filter(j => a.avoid.includes(j.key)).map(j => t(j.hint)).join(' ')
+        : t('Tick a joint that complains and the plan trains the same muscles by another road.')}
     </div>
 
     {/* The kit decides which exercises exist at all, so it is worth confirming here rather
@@ -185,13 +203,14 @@ function PlanPreview({ answers, close }) {
     <div className="small dim" style={{ margin: '-4px 2px 10px', lineHeight: 1.45 }}>
       {t('Aim to stop about {0} reps short of failure. Every exercise starts where your experience puts it and climbs from there.', r.rir)}
     </div>
-    {(r.fromHistory > 0 || r.loadedCount > 0 || r.supersets > 0 || r.finisher || r.daysClamped) && (
+    {(r.fromHistory > 0 || r.loadedCount > 0 || r.supersets > 0 || r.finisher || r.daysClamped || r.avoidedNames?.length > 0) && (
       <div className="small dim" style={{ margin: '0 2px 14px', lineHeight: 1.5 }}>
         {r.fromHistory > 0 && <div><Icon name="history" style={{ fontSize: 12, marginRight: 5 }} />{t('{0} movements start where your training history puts them, not at a questionnaire guess.', r.fromHistory)}</div>}
         {r.loadedCount > 0 && <div><Icon name="dumbbell" style={{ fontSize: 12, marginRight: 5 }} />{t('{0} lifts use your weights — they progress by load, so they need no rep ceiling.', r.loadedCount)}</div>}
         {r.supersets > 0 && <div><Icon name="link" style={{ fontSize: 12, marginRight: 5 }} />{t('{0} superset pairs — a press with a pull, back-to-back, because short rests are the point of this goal.', r.supersets)}</div>}
         {r.finisher && <div><Icon name="flame" style={{ fontSize: 12, marginRight: 5 }} />{t('Each session ends with a {0} finisher for conditioning.', r.finisher)}</div>}
         {r.daysClamped && <div><Icon name="calendar" style={{ fontSize: 12, marginRight: 5 }} />{t('You ticked fewer days than you asked for — the plan trains the days that exist.')}</div>}
+        {r.avoidedNames?.length > 0 && <div><Icon name="shield" style={{ fontSize: 12, marginRight: 5 }} />{t('Programmed around: {0}. The same muscles are trained by other movements.', r.avoidedNames.map(n => t(n)).join(', '))}</div>}
       </div>
     )}
 
