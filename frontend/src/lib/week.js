@@ -9,8 +9,44 @@
 
 import { MUSCLES, loadOfRoutine, rankOf, hardMusclesOf, sharedHard } from './muscles.js'
 import { weeklyLoad, thresholds, weekSlotCount, fillersFor, homeFor, accessoryCfg, DEFAULT_ANSWERS } from './planner.js'
-import { modeOf } from './history.js'
+import { modeOf, effectiveRoutineId } from './history.js'
 import { exOr } from './exercises.js'
+import { isoOf } from './format.js'
+
+/**
+ * Weekdays whose planned session keeps not happening — the plan asking to be moved.
+ *
+ * A weekday counts when its last `lookback` occurrences were all planned (day overrides
+ * respected: a week rescheduled to rest is handled, not missed) and none got a workout
+ * logged — while the user is otherwise active (trained within a fortnight), because
+ * "you keep missing Mondays" said to someone on holiday is just nagging. Occurrences
+ * older than the history itself never count: a plan younger than the window is innocent.
+ */
+export function missedPlanned(S, lookback = 3) {
+  const workouts = (S && S.workouts) || []
+  if (!workouts.length) return []
+  const lastT = new Date(workouts[workouts.length - 1].d + 'T12:00:00').getTime()
+  if (Date.now() - lastT > 14 * 86400000) return []
+  const firstT = new Date(workouts[0].d + 'T12:00:00').getTime()
+  const done = new Set(workouts.map(w => w.d))
+  const out = []
+  for (let d = 0; d < 7; d++) {
+    if (!((S.week || {})[d])) continue
+    let missed = 0
+    for (let k = 0; k < lookback; k++) {
+      const dt = new Date(); dt.setHours(12, 0, 0, 0)
+      const delta = ((dt.getDay() - d + 7) % 7) || 7   // most recent PAST occurrence of weekday d
+      dt.setDate(dt.getDate() - delta - k * 7)
+      if (dt.getTime() < firstT) { missed = 0; break }
+      const iso = isoOf(dt)
+      if (effectiveRoutineId(S, iso) == null) { missed = 0; break }
+      if (done.has(iso)) { missed = 0; break }
+      missed++
+    }
+    if (missed >= lookback) out.push(d)
+  }
+  return out
+}
 
 /**
  * What a session costs in minutes, honestly approximate: each rep-set is ~3 s a rep

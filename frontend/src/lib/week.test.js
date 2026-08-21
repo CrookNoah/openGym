@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { routineMuscles, weekAudit, adjacentOverlap, sessionMinutes, repairFor, applyRepair } from './week.js'
+import { routineMuscles, weekAudit, adjacentOverlap, sessionMinutes, repairFor, applyRepair, missedPlanned } from './week.js'
 import { MUSCLES } from './muscles.js'
+import { isoOf } from './format.js'
 import { generatePlan, DEFAULT_ANSWERS, fillersFor } from './planner.js'
 
 const FLOOR = { gear: [] }
@@ -160,5 +161,44 @@ describe('repairFor / applyRepair', () => {
 
   it('says so when nothing is scheduled', () => {
     expect(repairFor({ routines: [], week: {}, workouts: [] }, 'chest')).toBe(null)
+  })
+})
+
+describe('missedPlanned', () => {
+  const day = n => { const d = new Date(); d.setDate(d.getDate() + n); d.setHours(12, 0, 0, 0); return d }
+  // An active month of training that never lands on weekday `skip`.
+  const activeBut = skip => {
+    const out = []
+    for (let n = 1; n <= 28; n++) {
+      const d = day(-n)
+      if (d.getDay() === skip || n % 2 === 0) continue
+      out.push({ id: 'w' + n, d: isoOf(d), start: d.getTime(), entries: [] })
+    }
+    return out.reverse()
+  }
+  const routines = [{ id: 'p', name: 'Push', ex: [{ id: '0662', sets: 3, reps: 8 }] }]
+
+  it('names a planned weekday that keeps not happening while the user stays active', () => {
+    const S = { routines, week: { 1: 'p' }, dayPlan: {}, workouts: activeBut(1) }
+    expect(missedPlanned(S)).toContain(1)
+  })
+
+  it('forgives a weekday the user actually trained, or rescheduled away', () => {
+    const S = { routines, week: { 1: 'p' }, dayPlan: {}, workouts: activeBut(1) }
+    // trained last Monday → forgiven
+    const lastMon = day(-((day(0).getDay() - 1 + 7) % 7 || 7))
+    const s2 = { ...S, workouts: [...S.workouts, { id: 'mon', d: isoOf(lastMon), start: lastMon.getTime(), entries: [] }] }
+    expect(missedPlanned(s2)).not.toContain(1)
+    // overrode it to rest → handled, not missed
+    const s3 = { ...S, dayPlan: { [isoOf(lastMon)]: 'rest' } }
+    expect(missedPlanned(s3)).not.toContain(1)
+  })
+
+  it('says nothing to an inactive user or a young plan', () => {
+    expect(missedPlanned({ routines, week: { 1: 'p' }, dayPlan: {}, workouts: [] })).toEqual([])
+    const old = { id: 'w', d: isoOf(day(-30)), start: day(-30).getTime(), entries: [] }
+    expect(missedPlanned({ routines, week: { 1: 'p' }, dayPlan: {}, workouts: [old] })).toEqual([])
+    const young = { id: 'w', d: isoOf(day(-3)), start: day(-3).getTime(), entries: [] }
+    expect(missedPlanned({ routines, week: { 1: 'p' }, dayPlan: {}, workouts: [young] })).toEqual([])
   })
 })

@@ -1,14 +1,16 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { DAYN, uid, exCount } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 import { dayAssignSheet, loadStarterPlan, planToolsSheet, confirmSheet } from '../sheets.jsx'
 import { useUI } from '../store/useUI.js'
-import { planWizardSheet } from '../planner.jsx'
+import { planWizardSheet, planPreviewSheet } from '../planner.jsx'
 import Icon from '../components/Icon.jsx'
-import { Button } from '../components/ui.jsx'
+import { Button, Row } from '../components/ui.jsx'
 import { glyphOf, DEFAULT_GLYPH } from '../lib/glyphs.js'
-import { weekAudit, adjacentOverlap, sessionMinutes, routineMuscles, repairFor, applyRepair } from '../lib/week.js'
+import { weekAudit, adjacentOverlap, sessionMinutes, routineMuscles, repairFor, applyRepair, missedPlanned } from '../lib/week.js'
+import { weekShape, restWhy } from '../lib/planner.js'
 import { MUSCLE_NAME } from '../lib/muscles.js'
 import BodyMap, { BodyMapLegend } from '../components/BodyMap.jsx'
 
@@ -60,6 +62,12 @@ function WeekCheck({ S }) {
       {t('{0} and {1} both hit {2} hard, back to back — a rest day or a different session between them would recover better.',
         t(DAYN[o.day]), t(DAYN[o.next]), names(o.shared.slice(0, 3)))}
     </div>)}
+    {/* The plan asking to be moved: a weekday that keeps not happening, said once and
+        tappable — plan for the person you are, not the one you meant to be. */}
+    {missedPlanned(S).map(d => <div key={'mp' + d} className="small tappable" style={{ color: 'var(--yellow)', marginTop: 10, lineHeight: 1.45, cursor: 'pointer' }}
+      onClick={() => dayAssignSheet(d)}>
+      {t('{0} keeps getting missed — tap to move that session or make it a rest day.', t(DAYN[d]))}
+    </div>)}
     {audit.untrainable.length > 0 && <div className="small dim" style={{ marginTop: 10 }}>
       {t('Out of reach for your kit: {0}.', names(audit.untrainable))}
     </div>}
@@ -70,12 +78,31 @@ export default function Plan() {
   const nav = useNavigate()
   const S = useStore(s => s.S)
   const update = useStore(s => s.update)
+  // Swap mode: arm one day with its ⇄ button, tap another to trade their sessions —
+  // rearranging a week stops being two trips through the assign sheet.
+  const [swap, setSwap] = useState(null)
 
   const addRoutine = () => {
     const r = { id: uid(), name: t('New routine'), emoji: DEFAULT_GLYPH, ex: [] }
     update(s => { s.routines.push(r) })
     nav('/plan/r/' + r.id)
   }
+
+  const doSwap = (a, b) => {
+    update(s => {
+      const va = s.week[a], vb = s.week[b]
+      if (vb) s.week[a] = vb; else delete s.week[a]
+      if (va) s.week[b] = va; else delete s.week[b]
+    })
+    setSwap(null)
+    useUI.getState().toast(t('Swapped {0} and {1}', t(DAYN[a]), t(DAYN[b])))
+  }
+
+  // The rest-day reasoning, shown permanently when the week still matches a shape the
+  // generator would choose — a hand-arranged week gets no sentence pretending it was planned.
+  const scheduled = [0, 1, 2, 3, 4, 5, 6].filter(d => S.week[d])
+  const standardShape = scheduled.length > 0 &&
+    scheduled.join() === [...weekShape(scheduled.length)].sort((a, b) => a - b).join()
 
   return <>
     <div className="hdr">
@@ -90,12 +117,27 @@ export default function Plan() {
       <div className="list" style={{ display: 'flex', flexDirection: 'column' }}>
         {[1, 2, 3, 4, 5, 6, 0].map(d => {
           const r = S.routines.find(x => x.id === S.week[d])
-          return <div key={d} className="item" onClick={() => dayAssignSheet(d)}>
+          const armed = swap === d
+          return <div key={d} className="item" style={armed ? { borderColor: 'var(--acc)' } : undefined}
+            onClick={() => { if (swap != null) { swap === d ? setSwap(null) : doSwap(swap, d) } else dayAssignSheet(d) }}>
             <div className="grow"><div className="tt">{t(DAYN[d])}</div></div>
             {r ? <span className="tag acc"><Icon name={glyphOf(r.emoji)} />{r.name}</span> : <span className="tag">{t('Rest')}</span>}
+            {r && <button className="iconbtn" style={{ width: 30, height: 30, fontSize: 14, ...(armed ? { color: 'var(--acc)' } : {}) }}
+              aria-label={t('Swap days')} onClick={ev => { ev.stopPropagation(); setSwap(armed ? null : d) }}><Icon name="shuffle" /></button>}
             <Icon name="chevronRight" className="chev" /></div>
         })}
       </div>
+      {swap != null && <div className="small" style={{ color: 'var(--acc)', margin: '8px 2px 0' }}>
+        {t('Swapping {0} — tap the day to trade with.', t(DAYN[swap]))}
+      </div>}
+      {standardShape && <div className="small dim row" style={{ margin: '8px 2px 0', gap: 5 }}>
+        <Icon name="moon" style={{ fontSize: 12 }} />{t(restWhy(scheduled.length))}
+      </div>}
+      {S.plannerAnswers && <div style={{ marginTop: 10 }}>
+        <Row icon="sparkles" iconTint="var(--acc)" title={t('Regenerate my plan')}
+          subtitle={t('Same answers, fresh build — you preview it before anything changes.')}
+          accessory="chevron" onClick={() => planPreviewSheet(S.plannerAnswers)} />
+      </div>}
       <WeekCheck S={S} />
     </div><div>
       <div className="row between" style={{ marginTop: 22, marginBottom: 10 }}>
