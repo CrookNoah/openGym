@@ -7,6 +7,43 @@ import { planWizardSheet } from '../planner.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { glyphOf, DEFAULT_GLYPH } from '../lib/glyphs.js'
+import { weekAudit, adjacentOverlap } from '../lib/week.js'
+import { MUSCLE_NAME } from '../lib/muscles.js'
+import BodyMap, { BodyMapLegend } from '../components/BodyMap.jsx'
+
+// The wizard's coverage audit, running live on the plan as it is edited. A generated plan
+// arrives clean; the moment it is changed by hand, this is what keeps it honest — same
+// engine, same honest bar (scaled to kit and week size), no preview to scroll back to.
+function WeekCheck({ S }) {
+  const audit = weekAudit(S)
+  if (!audit) return null
+  const overlaps = adjacentOverlap(S)
+  const clean = !audit.light.length && !audit.missed.length
+  const names = ms => ms.map(m => t(MUSCLE_NAME[m])).join(', ')
+  return <div className="card" style={{ marginTop: 14 }}>
+    <h2>{t('Week check')} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {t('what this week hits')}</span></h2>
+    <BodyMap load={audit.load} body={S.body} />
+    <BodyMapLegend />
+    {clean && <div className="small" style={{ color: 'var(--green)', marginTop: 8 }}>
+      {t('Every muscle your kit can train gets enough work this week.')}
+    </div>}
+    {audit.missed.length > 0 && <>
+      <h4 className="sec" style={{ marginTop: 10 }}>{t('Not trained this week')}</h4>
+      <div className="mchips">{audit.missed.map(m => <span key={m} className="mchip miss">{t(MUSCLE_NAME[m])}</span>)}</div>
+    </>}
+    {audit.light.length > 0 && <>
+      <h4 className="sec" style={{ marginTop: 10 }}>{t('Getting some work, but light')}</h4>
+      <div className="mchips">{audit.light.map(m => <span key={m} className="mchip">{t(MUSCLE_NAME[m])}</span>)}</div>
+    </>}
+    {overlaps.map(o => <div key={o.day} className="small" style={{ color: 'var(--yellow)', marginTop: 10, lineHeight: 1.45 }}>
+      {t('{0} and {1} both hit {2} hard, back to back — a rest day or a different session between them would recover better.',
+        t(DAYN[o.day]), t(DAYN[o.next]), names(o.shared.slice(0, 3)))}
+    </div>)}
+    {audit.untrainable.length > 0 && <div className="small dim" style={{ marginTop: 10 }}>
+      {t('Out of reach for your kit: {0}.', names(audit.untrainable))}
+    </div>}
+  </div>
+}
 
 export default function Plan() {
   const nav = useNavigate()
@@ -38,6 +75,7 @@ export default function Plan() {
             <Icon name="chevronRight" className="chev" /></div>
         })}
       </div>
+      <WeekCheck S={S} />
     </div><div>
       <div className="row between" style={{ marginTop: 22, marginBottom: 10 }}>
         <h4 className="sec" style={{ margin: 0 }}>{t('Routines')}</h4>

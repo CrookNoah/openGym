@@ -9,6 +9,8 @@ import { addFoodSheet } from '../foodsheets.jsx'
 import { planWizardSheet } from '../planner.jsx'
 import { dayTotals, targetOf, MACROS, MACRO_NAME } from '../lib/food.js'
 import { easyWeekActive } from '../lib/progression.js'
+import { routineMuscles } from '../lib/week.js'
+import { MUSCLE_NAME } from '../lib/muscles.js'
 import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
@@ -91,6 +93,14 @@ export default function Home() {
           : routine ? <span className="tag acc">{t('Start')}</span>
           : <Icon name="plus" className="chev" />}
       </div>
+      {/* What today actually hits, without opening anything. Skipped mid-workout — the
+          workout screen is already telling a more precise story. */}
+      {routine && !S.active && (() => {
+        const chips = routineMuscles(routine)
+        return chips.length ? <div className="mchips" style={{ marginTop: 10 }}>
+          {chips.map(m => <span key={m} className="mchip">{t(MUSCLE_NAME[m])}</span>)}
+        </div> : null
+      })()}
     </div>
 
     {missed && <div className="card" style={{ borderColor: 'var(--yellow)' }}>
