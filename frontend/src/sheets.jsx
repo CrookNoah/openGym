@@ -841,6 +841,33 @@ export const exConfigSheet = (ex, existing, onSave, onDelete, routine) => ui().o
 // The other half of lib/ladders.js. The engine decides you have outgrown a variation and
 // names the next one; this is where you get to look at it and say yes. Nothing is swapped
 // behind your back — the same reason the app never loads the bar for you.
+// Rebuild a config for a different rung of the same ladder, carrying everything the user
+// configured on the old one — mode, ceilings, per-side, progression policy and increment,
+// and the warm-up toggle. Shared by LevelChange (the engine's verdict, written back into the
+// routine) and DropBackToday (the user's bad-day call, session only), so the two can never
+// drift over which settings survive a rung change.
+function rungConfig(newId, entry) {
+  const target = entry.target || {}
+  // A rung that is a position rather than a rep count (an L-sit, a handstand) has to
+  // arrive as a timed hold, or the app would ask for 10 reps of standing still.
+  const mode = isHeldRung(newId) ? 'time' : (modeOf({ ...target, id: entry.id }) === 'time' ? 'time' : 'reps')
+  const base = defaultConfig(newId, mode)
+  const cfg = { ...base, id: newId }
+  if (target.prog) cfg.prog = target.prog
+  if (target.inc > 0) cfg.inc = target.inc
+  if (target.warmup) cfg.warmup = true
+  if (mode === 'time') {
+    cfg.prog = 'time'
+    cfg.sec = target.sec || base.sec
+    if (target.secMax > 0) cfg.secMax = target.secMax
+  } else {
+    cfg.reps = target.reps || base.reps
+    if (target.repsMax > 0) cfg.repsMax = target.repsMax
+    if (target.side) cfg.side = true
+  }
+  return { cfg, mode, base, target }
+}
+
 function LevelChange({ entryIdx, close }) {
   const st = useStore(s => s.S)
   const A = st.active
@@ -859,28 +886,18 @@ function LevelChange({ entryIdx, close }) {
 
   const apply = () => {
     const newId = plan.nextId
-    // A rung that is a position rather than a rep count (an L-sit, a handstand) has to
-    // arrive as a timed hold, or the app would ask for ten reps of standing still.
-    const mode = isHeldRung(newId) ? 'time' : (modeOf({ ...target, id: entry.id }) === 'time' ? 'time' : 'reps')
-    const base = defaultConfig(newId, mode)
+    const { cfg, mode, base } = rungConfig(newId, entry)
     // The set count is inflated precisely *because* the old variation got easy — the engine
     // adds a set every time the rep range fills up. Carrying six sets onto a harder movement
     // is how a level-up becomes a session you quit, so going up resets to the normal count.
     // Going down keeps it: an easier variation is exactly where the volume is affordable.
-    const sets = up ? Math.min(target.sets || base.sets, base.sets) : Math.max(1, target.sets || base.sets)
-    const cfg = { ...base, id: newId, sets: Math.max(1, sets) }
-    if (target.prog) cfg.prog = target.prog
-    if (target.inc > 0) cfg.inc = target.inc
-    if (mode === 'time') {
-      cfg.prog = 'time'
-      // A harder position is worth a third of the time you had built up on the easy one —
-      // starting a level-up at the target you just maxed out is how a new rung gets abandoned.
-      cfg.sec = up ? Math.max(10, Math.round((target.secMax || target.sec || 45) / 3)) : (target.sec || base.sec)
-      if (target.secMax > 0) cfg.secMax = target.secMax
-    } else {
-      cfg.reps = up ? Math.max(3, Math.round((target.repsMax || target.reps || 10) / 3)) : (target.reps || base.reps)
-      if (target.repsMax > 0) cfg.repsMax = target.repsMax
-      if (target.side) cfg.side = true
+    cfg.sets = Math.max(1, up ? Math.min(target.sets || base.sets, base.sets) : Math.max(1, target.sets || base.sets))
+    if (up) {
+      // A harder position is worth a third of the time (or reps) you had built up on the easy
+      // one — starting a level-up at the target you just maxed out is how a new rung gets
+      // abandoned. Going down keeps the carried targets rungConfig already set.
+      if (mode === 'time') cfg.sec = Math.max(10, Math.round((target.secMax || target.sec || 45) / 3))
+      else cfg.reps = Math.max(3, Math.round((target.repsMax || target.reps || 10) / 3))
     }
     update(s => {
       const cur = s.active.entries[entryIdx]
@@ -947,25 +964,16 @@ function DropBackToday({ entryIdx, close }) {
   const target = entry.target || {}
 
   const apply = () => {
-    const mode = isHeldRung(prevId) ? 'time' : (modeOf({ ...target, id: entry.id }) === 'time' ? 'time' : 'reps')
-    const base = defaultConfig(prevId, mode)
     // Same sets, same targets, easier lever — the point of dropping back is finishing the
-    // prescription, not shrinking it.
-    const cfg = { ...base, id: prevId, sets: Math.max(1, target.sets || base.sets) }
-    if (mode === 'time') {
-      cfg.prog = 'time'
-      cfg.sec = target.sec || base.sec
-      if (target.secMax > 0) cfg.secMax = target.secMax
-    } else {
-      cfg.reps = target.reps || base.reps
-      if (target.repsMax > 0) cfg.repsMax = target.repsMax
-      if (target.side) cfg.side = true
-    }
+    // prescription, not shrinking it. rungConfig carries everything else (ceilings, side,
+    // policy, warm-up) exactly as a level change would.
+    const { cfg, base } = rungConfig(prevId, entry)
+    cfg.sets = Math.max(1, target.sets || base.sets)
     update(s => {
       const cur = s.active.entries[entryIdx]
       s.active.entries[entryIdx] = {
         id: prevId, sg: cur.sg, target: { ...cfg },
-        plan: { policy: cfg.prog || 'double', kind: 'first', why: ['Dropped back for today — the plan itself is unchanged.'] },
+        plan: { policy: cfg.prog, kind: 'first', why: ['Dropped back for today — the plan itself is unchanged.'] },
         sets: buildSets(s, cfg),
       }
       // Deliberately NOT carried into the routine — that is what makes it "for today".

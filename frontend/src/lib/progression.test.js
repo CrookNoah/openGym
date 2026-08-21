@@ -648,3 +648,29 @@ describe('warm-up sets and progression', () => {
     expect(sessionsFor(S, LIFT, T)).toEqual([])
   })
 })
+
+describe('warm-up sets and applyPrescription', () => {
+  it('never overwrites a warm-up row with the working prescription', () => {
+    const sets = [
+      { w: 30, r: 5, done: false, wu: true },
+      { w: 60, r: 5, done: false }, { w: 60, r: 5, done: false }, { w: 60, r: 5, done: false },
+    ]
+    const out = applyPrescription(sets, { kind: 'up', weight: 62.5, reps: 5, sets: 3 })
+    expect(out[0]).toEqual({ w: 30, r: 5, done: false, wu: true })
+    expect(out.slice(1).every(s => s.w === 62.5)).toBe(true)
+    expect(out.length).toBe(4)
+  })
+
+  it('grows to the prescribed count over working sets, not counting the warm-up', () => {
+    const sets = [
+      { w: 0, r: 6, done: false, wu: true },
+      { w: 0, r: 12, done: false }, { w: 0, r: 12, done: false }, { w: 0, r: 12, done: false },
+    ]
+    const out = applyPrescription(sets, { kind: 'up', weight: 0, reps: 8, sets: 4 })
+    expect(out.filter(s => !s.wu).length).toBe(4)
+    expect(out.filter(s => s.wu).length).toBe(1)
+    // The added set is a working set seeded from a working row, never a copy of the warm-up.
+    expect(out[out.length - 1].wu).toBeUndefined()
+    expect(out[out.length - 1].r).toBe(8)
+  })
+})

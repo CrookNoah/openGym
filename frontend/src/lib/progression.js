@@ -331,8 +331,12 @@ export function nextPrescription(S, cfg, routine) {
  */
 export function applyPrescription(sets, p) {
   if (!p || p.kind === 'off' || p.kind === 'first') return sets
+  // The prescription describes *working* sets, so a warm-up row passes through untouched —
+  // overwritten with the working numbers it would just be an extra working set wearing a W.
+  // It keeps the half-effort values buildSets gave it, which track the working sets closely
+  // enough for a warm-up.
   const out = sets.map(s => {
-    if (s.done) return s
+    if (s.done || s.wu) return s
     const o = { ...s }
     if (p.weight != null) o.w = p.weight
     if (p.reps != null) o.r = p.reps
@@ -342,9 +346,11 @@ export function applyPrescription(sets, p) {
   // A policy that decided on a set count gets to grow the list — bodyweight progression adds
   // a set where a barbell would have added a plate. Only ever upwards, and only by copying a
   // row that is already there: a session in progress must not lose a set it has logged.
-  if (p.sets > out.length) {
-    const seed = out[out.length - 1]
-    while (out.length < p.sets) out.push({ ...seed, done: false })
+  // Counted over working rows, or a warm-up would quietly eat the added set.
+  const working = out.filter(s => !s.wu).length
+  if (p.sets > working) {
+    const seed = [...out].reverse().find(s => !s.wu) || out[out.length - 1]
+    for (let n = working; n < p.sets; n++) out.push({ ...seed, done: false })
   }
   return out
 }

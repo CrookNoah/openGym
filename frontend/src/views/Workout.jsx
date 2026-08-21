@@ -125,8 +125,9 @@ function ExerciseBlock({ entryIdx, compact, planRir, onToggle, onField, onAddSet
       {ex.eq && <span className="tag">{t(ex.eq)}</span>}
       {best > 0 && <span className="tag nocap">{t('Best:')} {fmtNum(best)} {S.unit}</span>}
       {/* A bad day's exit, offered quietly: swap to the easier rung for this session only.
-          Gone once a set is logged — half a session of each movement helps nobody. */}
-      {!cardio && !entry.sets.some(s => s.done) && prevRung(S, entry.id) &&
+          Gone once a *working* set is logged — half a session of each movement helps nobody —
+          but a ticked warm-up is exactly when a bad day announces itself, so it doesn't count. */}
+      {!cardio && !entry.sets.some(s => s.done && !s.wu) && prevRung(S, entry.id) &&
         <button className="tag nocap tappable" style={{ cursor: 'pointer' }} onClick={() => dropBackTodaySheet(entryIdx)}>
           <Icon name="arrowDown" />{t('Too hard today?')}
         </button>}

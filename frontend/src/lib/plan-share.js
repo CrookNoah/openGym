@@ -42,6 +42,8 @@ function cleanEx(e) {
   // without its rule is just a list of weights.
   if (e.prog) o.prog = e.prog
   if (e.inc > 0) o.inc = e.inc
+  // The warm-up toggle travels like every other per-exercise setting.
+  if (e.warmup) o.warmup = true
   if (e.repsMin != null) o.repsMin = e.repsMin
   if (e.repsMax != null) o.repsMax = e.repsMax
   // The hold equivalent of repsMax — without it a shared plan loses the point at which

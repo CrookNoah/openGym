@@ -8,7 +8,7 @@
 // screen rather than only in a preview that scrolled away.
 
 import { MUSCLES, loadOfRoutine, rankOf } from './muscles.js'
-import { weeklyLoad, thresholds, weekSlotCount, coverageGaps } from './planner.js'
+import { weeklyLoad, thresholds, weekSlotCount } from './planner.js'
 
 /** The muscles one routine trains, hardest-worked first — the chips on the today card. */
 export function routineMuscles(routine, n = 5) {
@@ -33,7 +33,12 @@ export function weekAudit(S) {
   if (!slots) return null
   const load = weeklyLoad(routines, week)
   const th = thresholds(S, slots)
-  const gaps = coverageGaps(S, routines, week)
+  // The same worst-first ordering as coverageGaps, computed from the load and thresholds
+  // already in hand rather than calling it and re-deriving all three — this runs on every
+  // Plan-screen render, not once per generated plan.
+  const gaps = Object.keys(th)
+    .filter(m => (load[m] || 0) < th[m])
+    .sort((a, b) => (1 - (load[b] || 0) / th[b]) - (1 - (load[a] || 0) / th[a]))
   return {
     slots, load, th,
     light: gaps.filter(m => (load[m] || 0) > 0),
@@ -61,11 +66,14 @@ const HEAVY_SETS = 2
 export function adjacentOverlap(S) {
   const routines = (S && S.routines) || []
   const week = (S && S.week) || {}
+  const cache = new Map()   // a routine scheduled on several days is scored once
   const heavyOf = rid => {
+    if (cache.has(rid)) return cache.get(rid)
     const r = routines.find(x => x.id === rid)
-    if (!r) return null
-    const l = loadOfRoutine(r)
-    return { r, l, heavy: MUSCLES.filter(m => (l[m] || 0) >= HEAVY_SETS) }
+    const out = r ? { r, l: loadOfRoutine(r), heavy: null } : null
+    if (out) out.heavy = MUSCLES.filter(m => (out.l[m] || 0) >= HEAVY_SETS)
+    cache.set(rid, out)
+    return out
   }
   const out = []
   for (let d = 0; d < 7; d++) {

@@ -359,6 +359,10 @@ export function parseWorkoutCSV(text, { unit = 'kg' } = {}) {
     const set = isCardio
       ? { min: mins || 0, speed: mins > 0 ? Math.round(km / (mins / 60) * 10) / 10 : 0, done: true }
       : { w, r: reps || 0, done: true, u: rowUnit }
+    // A row the file itself calls a warm-up arrives marked wu, the same flag the app's own
+    // warm-up sets carry — otherwise every imported half-effort row would read as a missed
+    // working set and greet the user with a spurious deload.
+    if (!isCardio && /warm/i.test(cell(r, 'setType'))) set.wu = true
     // Effort rides along only where the app can show it again: a weighted rep set. A treadmill
     // row with an RPE would have nowhere to put it. A set is kept on one scale, so a file
     // carrying both columns is read as RIR — the same precedence setLabel reads them back with.
