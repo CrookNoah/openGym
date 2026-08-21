@@ -66,3 +66,26 @@ export async function shareExport(json, filename) {
   const w = await Filesystem.writeFile({ path: filename, directory: Directory.Cache, data: json, encoding: Encoding.UTF8 })
   await Share.share({ title: filename, url: w.uri })
 }
+
+/* ---- the Android back gesture ----
+   Without a listener, Capacitor's default for the hardware/gesture back is to close the
+   app — no matter that a sheet was open or the user was three screens deep. A back-swipe
+   means "one step out": the top sheet first, then the previous screen, and only from Home
+   with nothing open does it hand control back to the OS — as a minimize, never an exit.
+   (State is saved either way; the app vanishing mid-flow is still the wrong answer.) */
+let backWired = false
+export async function wireBackButton(step) {
+  if (!MOBILE || backWired) return
+  backWired = true
+  try {
+    const { App } = await import('@capacitor/app')
+    App.addListener('backButton', () => step())
+  } catch (e) { /* web build, or plugin unavailable — browser back works natively there */ }
+}
+
+export async function minimizeApp() {
+  try {
+    const { App } = await import('@capacitor/app')
+    await App.minimizeApp()
+  } catch (e) { /* iOS has no minimize and no back gesture to wire — nothing to do */ }
+}

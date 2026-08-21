@@ -7,6 +7,7 @@ import { ACCENTS } from './lib/format.js'
 import { setLang, useLang } from './lib/i18n.js'
 import { setNav } from './lib/nav.js'
 import { useWakeLock } from './lib/wakelock.js'
+import { wireBackButton, minimizeApp } from './lib/mobile.js'
 import { startFlow } from './sheets.jsx'
 import Icon from './components/Icon.jsx'
 import TabBar from './components/TabBar.jsx'
@@ -50,6 +51,18 @@ function Shell() {
   useEffect(() => { window.scrollTo(0, 0) }, [loc.pathname])
   // bound to the workout, not to the route — checking Stats mid-session keeps the screen on
   useWakeLock(!!S.active && S.keepAwake !== false)
+  // Android back gesture: one step out — the top sheet, then the previous screen, then
+  // minimize from Home. A locked sheet (the required weigh-in) swallows it: the flow has
+  // its own buttons and a back-swipe must not skip past them. See lib/mobile.js.
+  useEffect(() => {
+    wireBackButton(() => {
+      const ui = useUI.getState()
+      const top = ui.sheets[ui.sheets.length - 1]
+      if (top) { if (!top.locked) ui.closeSheet(top.id); return }
+      if (window.location.hash.replace(/^#/, '') !== '/home') { window.history.back(); return }
+      minimizeApp()
+    })
+  }, [])
 
   const authed = user || isGuest
   if (!ready && !authed) return (
