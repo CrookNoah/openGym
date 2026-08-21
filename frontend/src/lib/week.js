@@ -7,7 +7,7 @@
 // a hand-edited plan is held to the same standard as a generated one, live, on the Plan
 // screen rather than only in a preview that scrolled away.
 
-import { MUSCLES, loadOfRoutine, rankOf } from './muscles.js'
+import { MUSCLES, loadOfRoutine, rankOf, hardMusclesOf, sharedHard } from './muscles.js'
 import { weeklyLoad, thresholds, weekSlotCount } from './planner.js'
 
 /** The muscles one routine trains, hardest-worked first — the chips on the today card. */
@@ -47,43 +47,39 @@ export function weekAudit(S) {
   }
 }
 
-// One session's worth of effective sets that makes a muscle "trained hard that day". Two
-// primary sets, or five secondary ones — below that a shared muscle between two days is
-// assistance work, not a recovery problem.
-const HEAVY_SETS = 2
-
 /**
  * Adjacent scheduled days that hammer the same muscles.
  *
- * The generator spaces sessions so this never happens to a plan it built; dragging the week
- * around by hand can put two heavy pressing days back to back without anything saying so.
- * A pair is flagged when consecutive calendar days each give two or more effective sets to
- * two or more of the same muscles — one shared muscle is normal (everything shares a core),
- * two trained hard is the same session twice with no night's sleep between doing any good.
+ * "Hammer" is judged by hardMusclesOf (lib/muscles.js): primary work only, on muscles that
+ * actually need a night off — assistance work and daily-trainable muscles (abs, calves…)
+ * never trigger it, because a normal Push→Pull week is not a problem and saying it is
+ * teaches people to ignore the warning. One genuinely shared hard muscle is enough: chest
+ * on two consecutive days is the thing a rest day exists to prevent.
  *
- * Days are weekday indexes (0 = Sunday), checked circularly so Saturday → Sunday counts.
+ * The generator scores its own output against this exact function before choosing which
+ * session lands on which day, so a generated plan arrives clean; this fires for the weeks
+ * people drag together by hand. Days are weekday indexes (0 = Sunday), checked circularly —
+ * the week repeats, so Saturday into Sunday counts.
  */
 export function adjacentOverlap(S) {
   const routines = (S && S.routines) || []
   const week = (S && S.week) || {}
   const cache = new Map()   // a routine scheduled on several days is scored once
-  const heavyOf = rid => {
-    if (cache.has(rid)) return cache.get(rid)
-    const r = routines.find(x => x.id === rid)
-    const out = r ? { r, l: loadOfRoutine(r), heavy: null } : null
-    if (out) out.heavy = MUSCLES.filter(m => (out.l[m] || 0) >= HEAVY_SETS)
-    cache.set(rid, out)
-    return out
+  const hardOf = rid => {
+    if (!cache.has(rid)) {
+      const r = routines.find(x => x.id === rid)
+      cache.set(rid, r ? { r, ...hardMusclesOf(r) } : null)
+    }
+    return cache.get(rid)
   }
   const out = []
   for (let d = 0; d < 7; d++) {
     const next = (d + 1) % 7
     if (!week[d] || !week[next]) continue
-    const a = heavyOf(week[d]), b = heavyOf(week[next])
+    const a = hardOf(week[d]), b = hardOf(week[next])
     if (!a || !b) continue
-    const shared = a.heavy.filter(m => b.l[m] >= HEAVY_SETS)
-      .sort((x, y) => (a.l[y] + b.l[y]) - (a.l[x] + b.l[x]))
-    if (shared.length >= 2) out.push({ day: d, next, a: a.r, b: b.r, shared })
+    const shared = sharedHard(a, b)
+    if (shared.length) out.push({ day: d, next, a: a.r, b: b.r, shared })
   }
   return out
 }

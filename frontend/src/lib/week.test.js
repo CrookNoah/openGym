@@ -60,7 +60,6 @@ describe('adjacentOverlap', () => {
     expect(warn.length).toBe(1)
     expect(warn[0].day).toBe(1)
     expect(warn[0].shared[0]).toBe('chest')
-    expect(warn[0].shared.length).toBeGreaterThanOrEqual(2)
   })
 
   it('says nothing when a rest day sits between them', () => {
@@ -69,6 +68,24 @@ describe('adjacentOverlap', () => {
 
   it('lets push and pull sit next to each other', () => {
     expect(adjacentOverlap({ routines: [PUSH, PULL], week: { 1: 'p', 2: 'q' } })).toEqual([])
+  })
+
+  it('never warns about assistance work — a pull day is not a shoulder day', () => {
+    // Rows and pull-ups load the rear delts as secondaries all day long; that is not what a
+    // rest day exists to separate, and warning about it teaches people to ignore warnings.
+    const PULLS = { id: 'q2', name: 'Pull 2', ex: [
+      { id: '0652', sets: 4 }, { id: '3166', sets: 4 },
+    ] }
+    const warn = adjacentOverlap({ routines: [PUSH, PULLS], week: { 1: 'p', 2: 'q2' } })
+    expect(warn).toEqual([])
+  })
+
+  it('never warns about daily-trainable muscles — core work two days running is fine', () => {
+    const CORE = { id: 'c', name: 'Core', ex: [
+      { id: '0687', sets: 4 },   // russian twist
+      { id: '0705', sets: 4 },   // side bridge
+    ] }
+    expect(adjacentOverlap({ routines: [CORE], week: { 1: 'c', 2: 'c' } })).toEqual([])
   })
 
   it('checks the week as a circle, Saturday into Sunday', () => {

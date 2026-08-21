@@ -153,3 +153,37 @@ export function rankOf(load) {
   const missed = MUSCLES.filter(m => !(load[m] > 0))
   return { worked, missed }
 }
+
+/* ---- what a session hits HARD, for back-to-back planning ----
+   A different question from where the volume went. Two sessions on consecutive days are a
+   recovery problem only where both give a muscle real primary work: rear delts assisting on
+   a pull day do not make it a shoulder day, and abs, obliques, calves and forearms recover
+   overnight — half the training world trains them daily on purpose. Judging adjacency by
+   total load (secondaries included) is how a perfectly normal Push→Pull week gets scolded
+   for "hitting shoulders two days running". */
+
+// Trained-daily-by-design muscles: never a reason to separate two days.
+export const FAST_RECOVERY = ['abs', 'obliques', 'calves', 'forearm']
+// A muscle counts as primary work when the exercise weights it at least this much —
+// primaries are 1, secondaries 0.4, so this cleanly splits the two.
+const PRIMARY_W = 0.6
+// Primary effective sets in one session that make a muscle "trained hard that day". Three,
+// not two: a two-set accessory (a pair of shrugs at the end of a leg day) is a top-up, and
+// separating top-ups with rest days is not what anyone means by recovery. Three primary
+// sets is a muscle the session is actually about.
+const HARD_SETS = 3
+
+/** The muscles one routine trains hard: primary-driven, slow-recovering, ≥ HARD_SETS. */
+export function hardMusclesOf(routine) {
+  const load = {}
+  ;(routine?.ex || []).forEach(c => {
+    const m = musclesOf(EXIDX[c.id])
+    for (const slug in m) if (m[slug] >= PRIMARY_W) load[slug] = (load[slug] || 0) + m[slug] * (c.sets || 1)
+  })
+  return { load, hard: MUSCLES.filter(s => !FAST_RECOVERY.includes(s) && (load[s] || 0) >= HARD_SETS) }
+}
+
+/** Hard muscles two sessions share, most-loaded first — what a rest day exists to separate. */
+export const sharedHard = (a, b) =>
+  a.hard.filter(m => b.hard.includes(m))
+    .sort((x, y) => ((a.load[y] || 0) + (b.load[y] || 0)) - ((a.load[x] || 0) + (b.load[x] || 0)))

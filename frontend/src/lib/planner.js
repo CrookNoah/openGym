@@ -16,7 +16,7 @@
 import { LADDERS, rungsFor, ladderOf } from './ladders.js'
 import { EXIDX, exOr } from './exercises.js'
 import { PATTERN_GROUP } from './kit.js'
-import { loadOf, MUSCLES, MUSCLE_NAME } from './muscles.js'
+import { loadOf, MUSCLES, MUSCLE_NAME, hardMusclesOf, sharedHard } from './muscles.js'
 import { canDo, hasGear } from './gear.js'
 import { isHeldRung } from './ladders.js'
 import { uid } from './format.js'
@@ -611,7 +611,15 @@ export function generatePlan(S, answersIn) {
       if (!all.length) continue
       const already = new Set(routines.flatMap(r => r.ex.map(e => e.id)))
       const fresh = all.filter(id => !already.has(id))
-      const target = homeFor(muscle, trained().filter(r => r.ex.length < hardCap))
+      const withRoom = trained().filter(r => r.ex.length < hardCap)
+      // Same-muscle work concentrates: a second shrug goes next to the first, never into a
+      // fresh session — and while a session already carrying this muscle exists, no new
+      // session is opened for it at all, even if the carrier is full (the deepen path below
+      // grows it in place instead). Spreading one muscle across three sessions is what makes
+      // a week impossible to arrange without back-to-back repeats.
+      const carrier = withRoom.find(r => r.ex.some(e => all.includes(e.id)))
+      const hasCarrier = trained().some(r => r.ex.some(e => all.includes(e.id)))
+      const target = carrier || (hasCarrier ? null : homeFor(muscle, withRoom))
 
       if (fresh.length && target) {
         const cfg = accessoryCfg(S, fresh[0], target.ex.length, answers)
@@ -628,7 +636,11 @@ export function generatePlan(S, answersIn) {
       const entry = routines.flatMap(r => r.ex).find(e => all.includes(e.id) && e.sets < 5)
       if (entry) { entry.sets += 1; progressed = true; continue }
       // Or put the same movement in a second session, which is frequency rather than volume.
-      const other = homeFor(muscle, trained().filter(r => r.ex.length < hardCap && !r.ex.some(e => all.includes(e.id))))
+      // A second session and no further: two carriers of a hard muscle can always be placed
+      // with a rest between them, three cannot on a dense week.
+      const carriers = trained().filter(r => r.ex.some(e => all.includes(e.id))).length
+      const other = carriers >= 2 ? null
+        : homeFor(muscle, trained().filter(r => r.ex.length < hardCap && !r.ex.some(e => all.includes(e.id))))
       if (other) {
         const cfg = accessoryCfg(S, all[0], other.ex.length, answers)
         if (cfg) {
@@ -684,6 +696,41 @@ export function generatePlan(S, answersIn) {
         pairs++; supersets++
       }
     })
+  }
+
+  // ---- who sleeps next to whom ----
+  // The split decides what the sessions are; this decides which day each one lands on.
+  // Once days are dense enough to touch, the same six sessions can be a clean week or a
+  // chest-day pile-up depending purely on the ordering — so every assignment of sessions
+  // to the chosen days is scored by how many hard, slow-recovering muscles consecutive
+  // days share (the exact measure the Plan screen's Week check warns with, lib/week.js),
+  // and the quietest arrangement wins. The plan must never trip its own checker. Sessions
+  // are at most six, so brute force is cheap and deterministic; run after the backfill and
+  // the finisher, because they change what a session hits.
+  const dayList = Object.keys(week).map(Number).sort((a, b) => a - b)
+  if (dayList.length > 2) {
+    const adjacent = []   // index pairs in dayList that are consecutive calendar days (the week repeats, so it wraps)
+    for (let i = 0; i < dayList.length; i++) {
+      const j = (i + 1) % dayList.length
+      if ((dayList[j] - dayList[i] + 7) % 7 === 1) adjacent.push([i, j])
+    }
+    if (adjacent.length) {
+      const hard = new Map(routines.map(r => [r.id, hardMusclesOf(r)]))
+      const score = order => adjacent.reduce((n, [i, j]) => n + sharedHard(hard.get(order[i]), hard.get(order[j])).length, 0)
+      const ids = dayList.map(d => week[d])
+      let best = ids, bestScore = score(ids)
+      const walk = (order, rest) => {
+        if (bestScore === 0) return
+        if (!rest.length) {
+          const sc = score(order)
+          if (sc < bestScore) { best = order.slice(); bestScore = sc }
+          return
+        }
+        for (let i = 0; i < rest.length; i++) walk([...order, rest[i]], [...rest.slice(0, i), ...rest.slice(i + 1)])
+      }
+      if (bestScore > 0) walk([], ids)
+      dayList.forEach((d, i) => { week[d] = best[i] })
+    }
   }
 
   const load = weeklyLoad(routines, week)

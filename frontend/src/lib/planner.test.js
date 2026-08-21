@@ -8,6 +8,7 @@ import { EXIDX } from './exercises.js'
 import { canDo } from './gear.js'
 import { rungsFor } from './ladders.js'
 import { modeOf, isBw } from './history.js'
+import { adjacentOverlap } from './week.js'
 import { nextPrescription } from './progression.js'
 
 const FLOOR = { gear: [], routines: [], workouts: [], unit: 'lb' }
@@ -297,6 +298,28 @@ describe('generatePlan', () => {
       planFor(ans).routines.forEach(r => r.ex.forEach(e => {
         if (e.side) expect(e.reps % 2, EXIDX[e.id].n).toBe(0)
       }))
+    })
+  })
+
+  it('never trips its own back-to-back warning, for any answers', SWEEP, () => {
+    // The Plan screen's Week check warns when consecutive days hit the same hard muscles
+    // (lib/week.js). The generator scores session placement against that exact measure, so
+    // a plan it built must arrive clean — pressing "generate" and being scolded by the
+    // app's own checker is a contract violation, not a tuning issue.
+    everyCombo.forEach(ans => {
+      const { routines, week } = planFor(ans)
+      const warn = adjacentOverlap({ ...FLOOR, routines, week })
+      expect(warn, JSON.stringify({ ans, warn: warn.map(w => [w.day, w.next, w.shared]) })).toEqual([])
+    })
+  })
+
+  it('never trips the warning on a full-gym profile either', SWEEP, () => {
+    // Loaded lifts change what every session hits hard, so the floor sweep alone would miss
+    // exactly the profile in the bug report this test pins.
+    everyCombo.forEach(ans => {
+      const { routines, week } = generatePlan(GYM, ans)
+      const warn = adjacentOverlap({ ...GYM, routines, week })
+      expect(warn, JSON.stringify({ ans, warn: warn.map(w => [w.day, w.next, w.shared]) })).toEqual([])
     })
   })
 
