@@ -8,8 +8,9 @@
 // screen rather than only in a preview that scrolled away.
 
 import { MUSCLES, loadOfRoutine, rankOf, hardMusclesOf, sharedHard } from './muscles.js'
-import { weeklyLoad, thresholds, weekSlotCount } from './planner.js'
+import { weeklyLoad, thresholds, weekSlotCount, fillersFor, homeFor, accessoryCfg, DEFAULT_ANSWERS } from './planner.js'
 import { modeOf } from './history.js'
+import { exOr } from './exercises.js'
 
 /**
  * What a session costs in minutes, honestly approximate: each rep-set is ~3 s a rep
@@ -66,6 +67,50 @@ export function weekAudit(S) {
     light: gaps.filter(m => (load[m] || 0) > 0),
     missed: gaps.filter(m => !((load[m] || 0) > 0)),
     untrainable: MUSCLES.filter(m => !(m in th)),
+  }
+}
+
+/**
+ * The one-tap fix for a Week check gap — the generator's own backfill, offered on demand.
+ *
+ * A diagnosis without a cure is homework: the audit already knows which movement most
+ * directly trains a missed muscle (fillersFor), which session it belongs in (homeFor), and
+ * how the generator's own concentration rule works (join the session that already carries
+ * the muscle; open a new one only when none does). Returns what it *would* do, so the UI
+ * can put a sentence and a button in front of it:
+ *   { kind:'add', cfg, name, routine }        — add this configured exercise to that routine
+ *   { kind:'deepen', name, routine, entryId } — one more set of what is already there
+ *   null                                      — nothing this kit can reach helps
+ */
+export function repairFor(S, muscle) {
+  const routines = (S && S.routines) || []
+  const week = (S && S.week) || {}
+  const trained = routines.filter(r => Object.values(week).includes(r.id))
+  if (!trained.length) return null
+  const answers = (S && S.plannerAnswers) || DEFAULT_ANSWERS
+  const all = fillersFor(S, muscle, answers)
+  if (!all.length) return null
+  const already = new Set(routines.flatMap(r => r.ex.map(e => e.id)))
+  const fresh = all.filter(id => !already.has(id))
+  const carrier = trained.find(r => r.ex.some(e => all.includes(e.id)))
+  if (fresh.length) {
+    const target = carrier || homeFor(muscle, trained)
+    const cfg = accessoryCfg(S, fresh[0], target.ex.length, answers)
+    if (cfg) return { kind: 'add', cfg, name: exOr(cfg.id).n, routine: target }
+  }
+  const deep = trained.flatMap(r => r.ex.map(e => ({ r, e }))).find(x => all.includes(x.e.id) && (x.e.sets || 1) < 5)
+  if (deep) return { kind: 'deepen', name: exOr(deep.e.id).n, routine: deep.r, entryId: deep.e.id }
+  return null
+}
+
+/** Apply a repair, inside store.update. */
+export function applyRepair(s, rep) {
+  const r = (s.routines || []).find(x => x.id === rep.routine.id)
+  if (!r) return
+  if (rep.kind === 'add') r.ex.push({ ...rep.cfg })
+  else {
+    const e = r.ex.find(x => x.id === rep.entryId)
+    if (e) e.sets = (e.sets || 1) + 1
   }
 }
 

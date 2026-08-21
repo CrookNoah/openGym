@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { routineMuscles, weekAudit, adjacentOverlap, sessionMinutes } from './week.js'
+import { routineMuscles, weekAudit, adjacentOverlap, sessionMinutes, repairFor, applyRepair } from './week.js'
 import { MUSCLES } from './muscles.js'
-import { generatePlan, DEFAULT_ANSWERS } from './planner.js'
+import { generatePlan, DEFAULT_ANSWERS, fillersFor } from './planner.js'
 
 const FLOOR = { gear: [] }
 
@@ -122,5 +122,43 @@ describe('sessionMinutes', () => {
   it('is zero for an empty routine and survives nonsense', () => {
     expect(sessionMinutes({ ex: [] })).toBe(0)
     expect(sessionMinutes(null)).toBe(0)
+  })
+})
+
+describe('repairFor / applyRepair', () => {
+  const state = () => ({
+    gear: [], routines: [
+      { id: 'p', name: 'Push', ex: [{ id: '0662', sets: 4, reps: 10 }] },
+      { id: 'q', name: 'Legs', ex: [{ id: '3132', sets: 3, reps: 10 }] },
+    ], week: { 1: 'p', 4: 'q' }, workouts: [],
+  })
+
+  it('offers a configured exercise into the right session for a missed muscle', () => {
+    const rep = repairFor(state(), 'obliques')
+    expect(rep.kind).toBe('add')
+    expect(rep.cfg.sets).toBeGreaterThan(0)
+    expect(typeof rep.name).toBe('string')
+    // and applying it actually lands in that routine
+    const s = state()
+    const before = s.routines.map(r => r.ex.length).join()
+    applyRepair(s, rep)
+    expect(s.routines.map(r => r.ex.length).join()).not.toBe(before)
+    expect(s.routines.some(r => r.ex.some(e => e.id === rep.cfg.id))).toBe(true)
+  })
+
+  it('deepens instead of duplicating when every filler is already in the week', () => {
+    const s = state()
+    // pre-load every reachable adductor filler so nothing fresh exists
+    fillersFor(s, 'adductors', DEFAULT_ANSWERS).forEach(id => {
+      if (!s.routines[1].ex.some(e => e.id === id)) s.routines[1].ex.push({ id, sets: 2, reps: 12 })
+    })
+    const rep = repairFor(s, 'adductors')
+    expect(rep.kind).toBe('deepen')
+    applyRepair(s, rep)
+    expect(s.routines.flatMap(r => r.ex).find(e => e.id === rep.entryId).sets).toBe(3)
+  })
+
+  it('says so when nothing is scheduled', () => {
+    expect(repairFor({ routines: [], week: {}, workouts: [] }, 'chest')).toBe(null)
   })
 })

@@ -497,7 +497,7 @@ function routineGroup(r) {
 }
 // Best home for a muscle's accessory: a session training the same half, shortest first;
 // otherwise the shortest session with room.
-function homeFor(muscle, candidates) {
+export function homeFor(muscle, candidates) {
   const want = MUSCLE_GROUP[muscle]
   const byLen = [...candidates].sort((a, b) => a.ex.length - b.ex.length)
   if (!want || want === 'core') return byLen[0]
@@ -505,7 +505,8 @@ function homeFor(muscle, candidates) {
 }
 
 /** One configured accessory, for backfilling a gap. */
-function accessoryCfg(S, id, slotIndex, answers) {
+/** One configured accessory, for backfilling a gap — exported for the Week check repairs (lib/week.js). */
+export function accessoryCfg(S, id, slotIndex, answers) {
   if (!reachableId(S, id)) return null
   const g = goalOf(answers)
   const sets = setsFor(Math.max(3, slotIndex), answers)   // accessories are never the main lift

@@ -2,12 +2,13 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { DAYN, uid, exCount } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
-import { dayAssignSheet, loadStarterPlan, planToolsSheet } from '../sheets.jsx'
+import { dayAssignSheet, loadStarterPlan, planToolsSheet, confirmSheet } from '../sheets.jsx'
+import { useUI } from '../store/useUI.js'
 import { planWizardSheet } from '../planner.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { glyphOf, DEFAULT_GLYPH } from '../lib/glyphs.js'
-import { weekAudit, adjacentOverlap, sessionMinutes, routineMuscles } from '../lib/week.js'
+import { weekAudit, adjacentOverlap, sessionMinutes, routineMuscles, repairFor, applyRepair } from '../lib/week.js'
 import { MUSCLE_NAME } from '../lib/muscles.js'
 import BodyMap, { BodyMapLegend } from '../components/BodyMap.jsx'
 
@@ -15,11 +16,29 @@ import BodyMap, { BodyMapLegend } from '../components/BodyMap.jsx'
 // arrives clean; the moment it is changed by hand, this is what keeps it honest — same
 // engine, same honest bar (scaled to kit and week size), no preview to scroll back to.
 function WeekCheck({ S }) {
+  const update = useStore(s => s.update)
   const audit = weekAudit(S)
   if (!audit) return null
   const overlaps = adjacentOverlap(S)
   const clean = !audit.light.length && !audit.missed.length
   const names = ms => ms.map(m => t(MUSCLE_NAME[m])).join(', ')
+  // A diagnosis with the cure attached: tapping a gap offers the generator's own backfill —
+  // the right movement, configured, into the right session — behind one confirm.
+  const fix = m => {
+    const rep = repairFor(S, m)
+    if (!rep) { useUI.getState().toast(t('No good fix within your kit — add something by hand.')); return }
+    confirmSheet({
+      title: t('Close the gap?'),
+      message: rep.kind === 'add'
+        ? t('Add {0} ({1} sets) to {2}? You can tune or remove it there.', rep.name, rep.cfg.sets, rep.routine.name)
+        : t('One more set of {0} in {1}?', rep.name, rep.routine.name),
+      confirmText: rep.kind === 'add' ? t('Add it') : t('Add the set'),
+      onConfirm: () => {
+        update(s => applyRepair(s, rep))
+        useUI.getState().toast(t('{0} added to {1}', rep.name, rep.routine.name))
+      },
+    })
+  }
   return <div className="card" style={{ marginTop: 14 }}>
     <h2>{t('Week check')} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {t('what this week hits')}</span></h2>
     <BodyMap load={audit.load} body={S.body} />
@@ -28,12 +47,14 @@ function WeekCheck({ S }) {
       {t('Every muscle your kit can train gets enough work this week.')}
     </div>}
     {audit.missed.length > 0 && <>
-      <h4 className="sec" style={{ marginTop: 10 }}>{t('Not trained this week')}</h4>
-      <div className="mchips">{audit.missed.map(m => <span key={m} className="mchip miss">{t(MUSCLE_NAME[m])}</span>)}</div>
+      <h4 className="sec" style={{ marginTop: 10 }}>{t('Not trained this week')} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {t('tap one to fix it')}</span></h4>
+      <div className="mchips">{audit.missed.map(m =>
+        <span key={m} className="mchip miss tappable" style={{ cursor: 'pointer' }} onClick={() => fix(m)}>{t(MUSCLE_NAME[m])} +</span>)}</div>
     </>}
     {audit.light.length > 0 && <>
-      <h4 className="sec" style={{ marginTop: 10 }}>{t('Getting some work, but light')}</h4>
-      <div className="mchips">{audit.light.map(m => <span key={m} className="mchip">{t(MUSCLE_NAME[m])}</span>)}</div>
+      <h4 className="sec" style={{ marginTop: 10 }}>{t('Getting some work, but light')} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {t('tap one to fix it')}</span></h4>
+      <div className="mchips">{audit.light.map(m =>
+        <span key={m} className="mchip tappable" style={{ cursor: 'pointer' }} onClick={() => fix(m)}>{t(MUSCLE_NAME[m])} +</span>)}</div>
     </>}
     {overlaps.map(o => <div key={o.day} className="small" style={{ color: 'var(--yellow)', marginTop: 10, lineHeight: 1.45 }}>
       {t('{0} and {1} both hit {2} hard, back to back — a rest day or a different session between them would recover better.',
