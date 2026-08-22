@@ -7,7 +7,7 @@ openGym ships in two flavors from the same codebase:
 | Runs | in any browser, against your own server | natively on iPhone / Android (Capacitor shell) |
 | Accounts | passkey sign-in, one profile per person | none — the phone *is* the account |
 | Data | synced to your server, readable on desktop | stays on the device (file in the app's private storage) |
-| Reminders | Web Push from your server | native local notifications, no server involved |
+| Reminders | Web Push from your server | native local notifications, no server involved — including the escalating nudge ladder |
 | Exercise media | served by your server (`img/`, `gif/`) | loaded from the jsDelivr CDN |
 
 The mobile flavor never talks to a backend: no sign-in screen, no sync, no telemetry.
@@ -134,6 +134,18 @@ that would simply install. Your free options:
 - **License:** openGym is AGPL-3.0, which by itself sits badly with app-store terms of
   service. `NOTICE.md` carries an app-store exception (an additional permission under
   AGPL §7) granted by the copyright holder — relevant only if store distribution ever happens.
-- The app requests notification permission only when the workout-day reminder is switched
-  on, and (on Android) declares `SCHEDULE_EXACT_ALARM` so the reminder fires to the minute
-  where the user allows it.
+- The app requests notification permission only when the workout-day reminder or the
+  escalating nudge ladder is switched on, and (on Android) declares `SCHEDULE_EXACT_ALARM`
+  so reminders fire to the minute where the user allows it.
+- **The nudge ladder** (`src/lib/nudge.js`) is scheduled entirely in advance — there is no
+  server to evaluate "did they train?" when a notification is due. `nudgeLadder(S, now)` is
+  a pure function returning the exact list for the next seven days; `syncNudges` in
+  `src/lib/mobile.js` cancels the reserved id range (200–270) and schedules that list, and
+  the store re-runs it after every state change, so logging a workout removes the rest of
+  the day's rungs by the same path that a plan edit rebuilds them. Two consequences worth
+  knowing: the schedule only extends seven days past the last time the app was opened, and
+  notification bodies (routine name, target muscles) are visible on the lock screen.
+- The `Not home` button is a notification **action type**, registered on every sync so a
+  language change reaches notifications already on the schedule. Its tap arrives through
+  `localNotificationActionPerformed`, which Capacitor retains until a listener attaches —
+  so a tap that cold-starts the app still lands (see `wireNudgeActions`).
