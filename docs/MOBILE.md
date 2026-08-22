@@ -149,6 +149,11 @@ that would simply install. Your free options:
   a menu notification at each mealtime and a "what did you eat?" follow-up 90 minutes
   later, both computed in advance and re-synced on every state change — logging a meal is
   what silences the rest of that slot. Tapping one opens the Meals screen.
+- **Goal reminders** (`src/lib/goal.js`) use ids 400–414: a morning weigh-in prompt that
+  escalates with days missed, and a Sunday check-in. They ride the same master switch as
+  the nudge ladder rather than adding a fourth thing to configure, and are deliberately
+  capped at two a day — with meals and workout nudges also on, the goal must not become the
+  noisiest channel on the phone.
 - The `Not home` button is a notification **action type**, registered on every sync so a
   language change reaches notifications already on the schedule. Its tap arrives through
   `localNotificationActionPerformed`, which Capacitor retains until a listener attaches —

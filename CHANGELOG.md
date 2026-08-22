@@ -1,5 +1,49 @@
 # Changelog
 
+## v2.6.0 — 2026-08-22 — the goal, and a coach who can read it
+
+### One goal the whole app points at
+
+- 🎯 **A real goal, proposed rather than demanded.** Pick "lose weight" and openGym
+  offers the whole thing — a tenth of your body weight, about 0.6% a week, the date that
+  implies, and the calories and protein to match. Adjust anything; it starts from today so
+  progress is measurable.
+- 📉 **Trend, not the scale.** Body weight swings a kilo a day on water and salt, so the
+  headline number is a smoothed trend and the pace is a least-squares slope over three
+  weeks — never two points. The morning's raw reading is a footnote.
+- 🤔 **It refuses to judge you early.** Under ten days and four weigh-ins the verdict is
+  "still gathering, weigh in daily and there'll be a real answer within a fortnight" —
+  which is the honest answer, and a real state rather than a fallback.
+- 🩺 **It diagnoses before it prescribes.** When the trend stalls, the app checks the food
+  log and the workout history first: too few logged days means the fix is data; eating
+  above target means the fix is adherence; missed sessions mean the fix is showing up.
+  Only a genuinely followed plan is offered a smaller target — and a drift cap and a
+  weight-relative floor stop it walking anyone into a crash diet one polite tap at a time.
+  Taking the step holds protein and lets carbs and fat absorb it.
+- ⏰ **A morning weigh-in prompt that sharpens** the longer the scale goes untouched, plus a
+  Sunday check-in. Capped at two a day so the goal can never become the noisiest thing on
+  your phone.
+
+### A coach you can talk to
+
+- 💬 **Ask it anything about your training.** It reads your real plan, sessions, weight
+  trend and adherence, and answers in a sentence or two. Streams as it writes.
+- 🔒 **It cannot invent your data and it cannot change it.** Every figure must come from
+  the snapshot or a tool result; exercise search only ever returns movements that exist and
+  your kit can reach; and *no write tool executes* — every suggested change arrives as a
+  button you press, validated against real state at the moment you press it.
+- 📝 **A written weekly review** from the week's actual numbers. Falls back to the
+  deterministic verdict without an API key, so the feature is useful to everyone.
+- 🧠 Runs on your own Anthropic key, like the food estimates. Nothing else in openGym
+  changes without it.
+
+### Also
+
+- 🏋️ **"Lose fat, keep muscle" stops making training easier.** It was biasing toward easier
+  variations — the popular-fitness answer rather than the correct one. A deficit is exactly
+  when intensity has to hold: the deficit takes the fat, the training decides whether what
+  you lose is fat or muscle. Higher reps and short rests stay; the difficulty no longer drops.
+
 ## v2.5.0 — 2026-08-22 — the day of eating, given shape
 
 ### Food becomes Meals
