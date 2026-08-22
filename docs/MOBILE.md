@@ -145,6 +145,10 @@ that would simply install. Your free options:
   the day's rungs by the same path that a plan edit rebuilds them. Two consequences worth
   knowing: the schedule only extends seven days past the last time the app was opened, and
   notification bodies (routine name, target muscles) are visible on the lock screen.
+- **Meal reminders** (`src/lib/meals.js`) follow the same pattern in the id range 300–356:
+  a menu notification at each mealtime and a "what did you eat?" follow-up 90 minutes
+  later, both computed in advance and re-synced on every state change — logging a meal is
+  what silences the rest of that slot. Tapping one opens the Meals screen.
 - The `Not home` button is a notification **action type**, registered on every sync so a
   language change reaches notifications already on the schedule. Its tap arrives through
   `localNotificationActionPerformed`, which Capacitor retains until a listener attaches —

@@ -7,7 +7,10 @@ import {
   dayFood, dayTotals, totals, macroSplit, targetOf, remaining,
   MACROS, MACRO_NAME, SOURCES, isEstimate, avgKcal, copyDay,
 } from '../lib/food.js'
-import { addFoodSheet, foodFormSheet, foodTargetSheet } from '../foodsheets.jsx'
+import { addFoodSheet, foodFormSheet, foodTargetSheet, mealPlanSheet } from '../foodsheets.jsx'
+import { mealPlanFor, mealsOf, SLOT_NAME } from '../lib/meals.js'
+import { sessionBurn, kgOf } from '../lib/setup.js'
+import { lastBW } from '../lib/history.js'
 import { useUI } from '../store/useUI.js'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
@@ -45,9 +48,10 @@ export default function Food() {
     <div className="hdr">
       <button className="iconbtn" onClick={() => nav('/home')} aria-label={t('Home')}><Icon name="chevronLeft" /></button>
       <div style={{ flex: 1, marginLeft: 10 }}>
-        <h1>{t('Food')}</h1>
+        <h1>{t('Meals')}</h1>
         <div className="sub">{isToday ? t('Today') : fmtDate(iso, true)}</div>
       </div>
+      <button className="iconbtn" onClick={mealPlanSheet} aria-label={t('Meal plan')} title={t('Meal plan')}><Icon name="list" /></button>
       <button className="iconbtn" onClick={foodTargetSheet} aria-label={t('Daily target')}><Icon name="target" /></button>
     </div>
 
@@ -68,6 +72,18 @@ export default function Food() {
       {tgt && tgt.kcal > 0 && <div className="wprog" style={{ marginTop: 8 }}>
         <i style={{ width: pct * 100 + '%', background: over ? 'var(--yellow)' : undefined }} />
       </div>}
+      {/* Calories out, as context only. The target's activity assumption already includes
+          training — a burn that "earns" extra food is how tracking apps teach overeating. */}
+      {(() => {
+        const mins = S.workouts.filter(w => w.d === iso && w.end > w.start)
+          .reduce((n, w) => n + Math.min(180, (w.end - w.start) / 60000), 0)
+        const bwv = lastBW(S)
+        if (!mins || !bwv) return null
+        const burn = sessionBurn(mins, kgOf(bwv.w, S.unit))
+        return <div className="small dim" style={{ marginTop: 8 }}>
+          {t('Training burned roughly {0} kcal today — already assumed by your target, not an extra allowance.', burn)}
+        </div>
+      })()}
 
       {/* Macros as their own rows: a stacked bar of three numbers is pretty and unreadable,
           and the useful comparison is each macro against its own target, not against the others. */}
@@ -91,8 +107,8 @@ export default function Food() {
       <Button variant="primary" icon="plus" onClick={() => addFoodSheet(iso)}>{t('Add food')}</Button>
     </div>
 
-    {entries.length ? <div className="list">
-      {entries.map(e => <div key={e.id} className="item" onClick={() => foodFormSheet({ existing: e, iso })}>
+    {(() => {
+      const row = e => <div key={e.id} className="item" onClick={() => foodFormSheet({ existing: e, iso })}>
         <div className="grow">
           <div className="tt">{e.n}</div>
           <div className="ss">{[e.q, `${e.kcal} kcal`, `P ${fmtNum(e.p)} · C ${fmtNum(e.c)} · F ${fmtNum(e.f)}`].filter(Boolean).join(' · ')}</div>
@@ -100,11 +116,34 @@ export default function Food() {
         {/* An AI number and a number off a packet must never look the same. */}
         {isEstimate(e) && <span className="tag" title={t('AI estimate')}><Icon name="sparkles" /></span>}
         <Icon name="chevronRight" className="chev" />
-      </div>)}
-    </div> : <div className="empty">
-      <div className="ico"><Icon name="clipboard" /></div>
-      {isToday ? t('Nothing logged yet today.') : t('Nothing logged on this day.')}
-    </div>}
+      </div>
+      const plan = mealPlanFor(S)
+      // Without a calorie target the day stays one flat list — an unpriced plan is noise.
+      if (!plan) return entries.length ? <div className="list">{entries.map(row)}</div>
+        : <div className="empty">
+          <div className="ico"><Icon name="clipboard" /></div>
+          {isToday ? t('Nothing logged yet today.') : t('Nothing logged on this day.')}
+        </div>
+      const grouped = mealsOf(S, iso)
+      return plan.map(meal => {
+        const list = grouped[meal.key] || []
+        const got = Math.round(list.reduce((n, e) => n + (Number(e.kcal) || 0), 0))
+        return <div key={meal.key} style={{ marginBottom: 14 }}>
+          <div className="row between" style={{ margin: '0 2px 6px' }}>
+            <h4 className="sec" style={{ margin: 0 }}>{t(SLOT_NAME[meal.key])} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {meal.time}</span></h4>
+            <span className="small" style={{ color: got > meal.kcal * 1.25 ? 'var(--yellow)' : 'var(--label-2)' }}>
+              {got ? `${got} / ` : ''}≈ {meal.kcal} kcal{meal.p ? ` · ${meal.p} g` : ''}
+            </span>
+          </div>
+          {list.length
+            ? <div className="list">{list.map(row)}</div>
+            : <div className="item tappable" style={{ cursor: 'pointer' }} onClick={() => addFoodSheet(iso)}>
+              <span className="lrow-i" style={{ background: 'var(--surface-3)' }}><Icon name="plus" /></span>
+              <div className="grow"><div className="ss" style={{ lineHeight: 1.4 }}>{meal.foods ? t(meal.foods) : t('Nothing logged yet — tap to add.')}</div></div>
+            </div>}
+        </div>
+      })
+    })()}
 
     {/* Most days are yesterday with different timestamps — one tap covers the common case,
         and every copied entry stays individually editable. */}

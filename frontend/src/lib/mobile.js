@@ -11,6 +11,7 @@
 // web bundles; the Capacitor plugins are only ever imported behind it.
 import { t } from './i18n.js'
 import { nudgeLadder, nudgePreview, NUDGE_ID_BASE, NUDGE_ID_MAX, NUDGE_PREVIEW_ID, NUDGE_ACTION_TYPE, NOT_HOME_ACTION } from './nudge.js'
+import { mealReminders, MEAL_ID_BASE, MEAL_ID_MAX } from './meals.js'
 
 export const MOBILE = import.meta.env.VITE_MOBILE === '1'
 
@@ -131,6 +132,52 @@ export async function previewNudge(S) {
     })
     return true
   } catch (e) { return false }
+}
+
+/* ---- meal reminders ----
+   Same contract as the nudge ladder, different subject: lib/meals.js computes the exact
+   list (mealtime menu, then a "what did you eat?" follow-up that a logged meal silences),
+   and this cancels the reserved range and schedules that list — fingerprinted, because the
+   store re-syncs after every state change and most changes move no meal. Tapping one is
+   handled in App.jsx: it just opens the Meals screen, where the answer belongs. */
+const MEAL_IDS = []
+for (let i = MEAL_ID_BASE; i <= MEAL_ID_MAX; i++) MEAL_IDS.push({ id: i })
+export const MEAL_ACTION_TYPE = 'meal'
+let lastMeals = null
+
+export async function syncMeals(S, interactive = false) {
+  try {
+    const want = S?.meals?.on ? JSON.stringify(mealReminders(S)) : '[]'
+    if (!interactive && want === lastMeals) return true
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    await LocalNotifications.cancel({ notifications: MEAL_IDS }).catch(() => {})
+    lastMeals = want
+    if (!S?.meals?.on) return true
+    let perm = await LocalNotifications.checkPermissions()
+    if (perm.display !== 'granted' && interactive) perm = await LocalNotifications.requestPermissions()
+    if (perm.display !== 'granted') { lastMeals = null; return false }
+    const list = JSON.parse(want).map(n => ({
+      id: n.id, title: n.title, body: n.body,
+      actionTypeId: MEAL_ACTION_TYPE, extra: { iso: n.iso, slot: n.slot },
+      schedule: { at: new Date(n.at), allowWhileIdle: true },
+    }))
+    if (list.length) await LocalNotifications.schedule({ notifications: list })
+    return true
+  } catch (e) { lastMeals = null; return false }
+}
+
+// A tapped meal reminder should land the person on the Meals screen with the log one tap
+// away — the notification asked a question, this is where it gets answered.
+let mealWired = false
+export async function wireMealActions(onOpen) {
+  if (!MOBILE || mealWired) return
+  mealWired = true
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    LocalNotifications.addListener('localNotificationActionPerformed', ev => {
+      if (ev?.notification?.actionTypeId === MEAL_ACTION_TYPE) onOpen(ev?.notification?.extra?.iso || null)
+    })
+  } catch (e) { /* web build */ }
 }
 
 // "Not home" tapped from the shade: hand the day back to the caller, which defers it in

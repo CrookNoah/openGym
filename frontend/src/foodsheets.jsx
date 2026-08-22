@@ -15,6 +15,8 @@ import { hasKey, estimateMeal, shrinkToBase64, AI_MODELS, getModel, setModel, ge
 import Icon from './components/Icon.jsx'
 import { Button, Stepper, Switch, Row, SelectRow, NumberField } from './components/ui.jsx'
 import { confirmSheet } from './sheets.jsx'
+import { MEAL_SLOTS, SLOT_NAME, DIET_STYLES, DEF_MEALS, mealsCfg, styleOf, mealPlanFor } from './lib/meals.js'
+import { MOBILE, syncMeals } from './lib/mobile.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -413,3 +415,51 @@ function BarcodeScan({ iso, close }) {
   </>
 }
 export const barcodeSheet = iso => ui().openSheet(close => <BarcodeScan iso={iso} close={close} />)
+
+/* ============================ the meal plan ============================ */
+
+// Style, times, reminders — the whole configuration of the day of eating in one sheet.
+// The plan preview at the top re-prices live as the style changes, because "how would 16:8
+// split my day" is the question being answered, and answering it with a saved-and-reopened
+// round trip is answering it badly.
+function MealPlan({ close }) {
+  const st = useStore(s => s.S)
+  const cfg = mealsCfg(st)
+  const setCfg = patch => update(s => { s.meals = { ...DEF_MEALS, ...(s.meals || {}), ...patch } })
+  const setTime = (k, v) => setCfg({ times: { ...cfg.times, [k]: v } })
+  const style = styleOf(st)
+  const plan = mealPlanFor(st)
+  const toggle = async () => {
+    if (!cfg.on && MOBILE) {
+      const ok = await syncMeals({ ...st, meals: { ...cfg, on: true } }, true)
+      if (!ok) { toast(t('Could not change notification settings')); return }
+    }
+    setCfg({ on: !cfg.on })
+  }
+  return <>
+    <h3>{t('Meal plan')}</h3>
+    <div className="muted small" style={{ marginBottom: 12, lineHeight: 1.5 }}>
+      {t('Your daily target, split across the day by an eating style. The style moves the same calories around — it never changes how much you eat, only when and as what.')}
+    </div>
+    <SelectRow icon="list" iconTint="var(--acc)" title={t('Eating style')} sheetTitle={t('Eating style')}
+      value={cfg.style} onChange={v => setCfg({ style: v })}
+      options={DIET_STYLES.map(d => ({ value: d.key, label: t(d.name), subtitle: t(d.hint) }))} />
+    <div className="small dim" style={{ margin: '6px 2px 12px' }}>{t(style.hint)}</div>
+    {plan ? <div className="sect-b" style={{ marginBottom: 12 }}>
+      {plan.map(m => <Row key={m.key} icon="clock" iconTint="var(--purple)" title={t(SLOT_NAME[m.key])}
+        subtitle={`≈ ${m.kcal} kcal${m.p ? ` · ${t('Protein')} ${m.p} g` : ''}`}>
+        <input type="time" className="timef" value={m.time} onChange={e => setTime(m.key, e.target.value)} />
+      </Row>)}
+    </div> : <div className="small" style={{ color: 'var(--yellow)', marginBottom: 12 }}>
+      {t('Set a calorie target first — a plan with no number to split is just a list of mealtimes.')}
+    </div>}
+    {MOBILE && <div className="sect-b" style={{ marginBottom: 12 }}>
+      <Row icon="bell" iconTint="var(--orange)" title={t('Meal reminders')}
+        subtitle={t('A menu at each mealtime, and a “what did you eat?” a while after — logging a meal silences the rest.')}>
+        <Switch checked={!!cfg.on} onChange={toggle} />
+      </Row>
+    </div>}
+    <Button variant="primary" onClick={close}>{t('Done')}</Button>
+  </>
+}
+export const mealPlanSheet = () => ui().openSheet(close => <MealPlan close={close} />)

@@ -8,7 +8,7 @@ import { setLang, useLang, t } from './lib/i18n.js'
 import { setNav } from './lib/nav.js'
 import { deferToday } from './lib/nudge.js'
 import { useWakeLock } from './lib/wakelock.js'
-import { wireBackButton, minimizeApp, wireNudgeActions } from './lib/mobile.js'
+import { wireBackButton, minimizeApp, wireNudgeActions, wireMealActions } from './lib/mobile.js'
 import { startFlow } from './sheets.jsx'
 import { maybeStartSetup } from './setup.jsx'
 import Icon from './components/Icon.jsx'
@@ -72,6 +72,9 @@ function Shell() {
       useStore.getState().update(s => deferToday(s, iso || todayISO()))
       useUI.getState().toast(t('Pushed back an hour. Enjoy the commute.'))
     })
+    // A tapped meal reminder lands on the Meals screen — it asked what you ate; this is
+    // where the answer goes.
+    wireMealActions(() => navigate('/food'))
   }, [])
 
   const authed = user || isGuest

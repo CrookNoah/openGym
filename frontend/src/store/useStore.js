@@ -3,7 +3,7 @@ import { api } from '../lib/api.js'
 import { localTZ } from '../lib/format.js'
 import { registerCustom } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
-import { MOBILE, nativeLoad, nativeSave, syncReminder, syncNudges } from '../lib/mobile.js'
+import { MOBILE, nativeLoad, nativeSave, syncReminder, syncNudges, syncMeals } from '../lib/mobile.js'
 
 const KEY = 'gym_state_v1'
 export const DEF = {
@@ -48,7 +48,13 @@ export const DEF = {
   nudge: { on: false, home: '17:30', quiet: '22:00', tone: 'push', notHome: null },
   // Day the first-run setup flow was started or skipped (lib/setup.js). Null = never seen
   // it, which on a blank profile is what makes the welcome sheet appear.
-  setupDone: null, effort: null
+  setupDone: null,
+  // The day of eating, given shape (lib/meals.js): which eating style splits the daily
+  // target across meals, when those meals are, and whether mealtime reminders fire.
+  meals: { on: false, style: 'balanced', times: { breakfast: '08:00', lunch: '12:30', snack: '16:00', dinner: '19:00' } },
+  // Last day the "worth buying" card's "not now" was tapped (lib/setup.js) — the shopping
+  // suggestion keeps coming back, but politely. Null = never dismissed.
+  gearNagDismissed: null, effort: null
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 
@@ -70,7 +76,7 @@ export const useStore = create((set, get) => {
   // storage eviction) and keep the native reminder schedule in step with the weekly plan.
   const nativePersist = () => {
     clearTimeout(saveTm)
-    saveTm = setTimeout(() => { saveTm = null; nativeSave(get().S); syncReminder(get().S); syncNudges(get().S) }, 800)
+    saveTm = setTimeout(() => { saveTm = null; nativeSave(get().S); syncReminder(get().S); syncNudges(get().S); syncMeals(get().S) }, 800)
   }
 
   const persist = (S, push = true) => {

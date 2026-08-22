@@ -25,6 +25,8 @@ import { MUSCLE_NAME } from './lib/muscles.js'
 import Icon from './components/Icon.jsx'
 import { Button, Row, Segmented } from './components/ui.jsx'
 import { MacroFields } from './foodsheets.jsx'
+import { DIET_STYLES, DEF_MEALS } from './lib/meals.js'
+import { SelectRow } from './components/ui.jsx'
 
 const ui = () => useUI.getState()
 const update = (...a) => useStore.getState().update(...a)
@@ -129,6 +131,7 @@ function DietStep({ close }) {
   const goal = (st.plannerAnswers || {}).goal
   const [plan] = useState(() => dietPlanFor(st, goal))
   const [v, setV] = useState(() => (plan ? { kcal: plan.kcal, p: plan.p, c: plan.c, f: plan.f } : { kcal: 0, p: 0, c: 0, f: 0 }))
+  const [styleKey, setStyleKey] = useState(() => (st.meals || DEF_MEALS).style || 'balanced')
   // No weigh-in means nothing honest to compute — every number is per-kilo. The flow always
   // collects one first, so this is belt and braces for a re-run that skipped the scale.
   if (!plan) return <>
@@ -144,9 +147,12 @@ function DietStep({ close }) {
   const burn = mins ? sessionBurn(mins, kg) : 0
   const save = () => {
     const any = v.kcal > 0 || v.p > 0 || v.c > 0 || v.f > 0
-    update(s => { s.foodTarget = any ? { ...v } : null })
+    update(s => {
+      s.foodTarget = any ? { ...v } : null
+      s.meals = { ...DEF_MEALS, ...(s.meals || {}), style: styleKey }
+    })
     close()
-    ui().toast(any ? t('Daily target set — the Food tab tracks against it') : t('Target removed'))
+    ui().toast(any ? t('Daily target set — the Meals tab tracks against it') : t('Target removed'))
     adviceSheet()
   }
   return <>
@@ -157,6 +163,12 @@ function DietStep({ close }) {
       {plan.floored ? ' ' + t('(Held above a floor — cutting faster than this costs the muscle you are training for.)') : ''}
     </div>
     <MacroFields v={v} setV={setV} />
+    {/* How the day carries those numbers: the eating style splits the target into meals on
+        the Meals tab, with mealtimes and (on the phone) reminders to log each one. */}
+    <SelectRow icon="list" iconTint="var(--acc)" title={t('Eating style')} sheetTitle={t('Eating style')}
+      value={styleKey} onChange={setStyleKey}
+      options={DIET_STYLES.map(d => ({ value: d.key, label: t(d.name), subtitle: t(d.hint) }))} />
+    <div style={{ height: 10 }} />
     <div className="small dim" style={{ lineHeight: 1.45, marginBottom: 14 }}>
       {t('Maintenance estimate: about {0} kcal, from body weight alone — the app knows nothing else about you, so treat it as a starting point: watch the weekly weigh-in trend and adjust by 150–200 kcal if it moves the wrong way.', fmtNum(plan.maintenance))}
       {burn ? ' ' + t('A session of your new plan is roughly {0} kcal of that.', fmtNum(burn)) : ''}
@@ -177,7 +189,7 @@ function AdviceStep({ close }) {
   return <>
     <h3 className="row" style={{ gap: 8 }}><Icon name="checkCircle" style={{ color: 'var(--acc)' }} />{t('You’re set')}</h3>
     <div className="muted small" style={{ marginBottom: 14, lineHeight: 1.5 }}>
-      {t('Your plan is on the Plan tab, today’s session is on Home, and the Food tab tracks the day against your targets.')}
+      {t('Your plan is on the Plan tab, today’s session is on Home, and the Meals tab tracks the day against your targets.')}
     </div>
     {picks.length > 0 && <>
       <h4 className="sec">{t('Worth buying, when you can')}</h4>

@@ -4,12 +4,13 @@ import { useStore } from '../store/useStore.js'
 import { effectiveRoutine, effectiveRoutineId, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
 import { fmtNum, fmtDate, todayISO, isoOf, weekKey, DAYS } from '../lib/format.js'
 import { t, dateLocale } from '../lib/i18n.js'
-import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, loadStarterPlan, bwDeltaColor } from '../sheets.jsx'
+import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, loadStarterPlan, bwDeltaColor, gearSheet } from '../sheets.jsx'
 import { addFoodSheet } from '../foodsheets.jsx'
 import { planWizardSheet } from '../planner.jsx'
 import { dayTotals, targetOf, MACROS, MACRO_NAME } from '../lib/food.js'
 import { easyWeekActive } from '../lib/progression.js'
 import { suggestEasyWeek, dismissEasyWeek } from '../lib/fatigue.js'
+import { gearNag, dismissGearNag } from '../lib/setup.js'
 import { routineMuscles } from '../lib/week.js'
 import { MUSCLE_NAME } from '../lib/muscles.js'
 import LineChart from '../components/LineChart.jsx'
@@ -64,6 +65,9 @@ export default function Home() {
   // arrays themselves would recompute for every food entry and weigh-in anyway.
   const fatigueCard = useMemo(() => suggestEasyWeek(S),
     [S.workouts.length, S.workouts[S.workouts.length - 1]?.d, S.routines.length, S.easyUntil, S.fatigueDismissed])
+  // Scans the exercise DB per unowned item, so it must not re-run because a set was ticked.
+  const buyCard = useMemo(() => gearNag(S),
+    [JSON.stringify(S.gear), S.gearNagDismissed, S.plannerAnswers?.goal, S.plannerAnswers?.level])
 
   const wThisWeek = S.workouts.filter(w => weekKey(w.d) === weekKey(todayISO())).length
   const plannedPerWeek = Object.keys(S.week).filter(k => S.week[k]).length
@@ -203,9 +207,30 @@ export default function Home() {
       </div>
     </div>}
 
+    {/* The standing shopping suggestion: the one purchase most worth making for the goal,
+        judged by what it unlocks (lib/setup.js). "Not now" snoozes a fortnight rather than
+        killing it — the gap in the kit does not close because the card did. */}
+    {(() => {
+      const g = buyCard
+      if (!g) return null
+      return <div className="card" style={{ borderColor: 'var(--acc)' }}>
+        <div className="row" style={{ gap: 9 }}>
+          <span className="lrow-i" style={{ background: 'var(--acc)' }}><Icon name="dumbbell" /></span>
+          <div className="grow">
+            <div className="tt">{t('Worth buying: {0}', t(g.name))}</div>
+            <div className="ss">{t(g.why)}{g.exN > 0 ? ' ' + t('Unlocks {0} exercises.', g.exN) : ''}</div>
+          </div>
+        </div>
+        <div className="row" style={{ gap: 8, marginTop: 12 }}>
+          <Button variant="primary" size="sm" icon="check" onClick={() => gearSheet()}>{t('Got it now')}</Button>
+          <Button size="sm" onClick={() => update(s => dismissGearNag(s))}>{t('Not now')}</Button>
+        </div>
+      </div>
+    })()}
+
     <div className="card tappable" style={{ cursor: 'pointer' }} onClick={() => nav('/food')}>
       <div className="row between" style={{ marginBottom: 6 }}>
-        <h2 style={{ margin: 0 }}>{t('Food')}</h2>
+        <h2 style={{ margin: 0 }}>{t('Meals')}</h2>
         <Button size="sm" icon="plus" onClick={ev => { ev.stopPropagation(); addFoodSheet(todayISO()) }}>{t('Log')}</Button>
       </div>
       {(() => {

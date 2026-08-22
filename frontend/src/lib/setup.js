@@ -14,6 +14,7 @@
 // the flow prefills the food targets with it and every field stays editable.
 
 import { GEAR, gearChosen, expandGear, canDo } from './gear.js'
+import { todayISO } from './format.js'
 import { EXDB } from './exercises.js'
 import { newlyUnlocked } from './kit.js'
 import { thresholds } from './planner.js'
@@ -167,3 +168,27 @@ export function gearAdvice(S, answers = {}, max = 3) {
   })
   return out.sort((a, b) => b.score - a.score).slice(0, max)
 }
+
+/* ============================ the standing reminder ============================ */
+
+// How long "not now" holds before the shopping suggestion returns. Two weeks: often enough
+// to be the constant reminder it is meant to be, rare enough that dismissing it stays a
+// real choice rather than a daily chore.
+const GEAR_NAG_SNOOZE_DAYS = 14
+
+/**
+ * The one purchase most worth making for this profile's goal, for the Home card — or null
+ * while there is nothing to say: advice needs chosen kit and a goal to judge against, the
+ * card holds its tongue for a fortnight after "not now", and someone whose kit already
+ * covers their goal hears nothing at all.
+ */
+export function gearNag(S, now = Date.now()) {
+  if (!S || !S.plannerAnswers) return null
+  const since = iso => iso ? (now - new Date(iso + 'T12:00:00').getTime()) / 86400000 : Infinity
+  if (since(S.gearNagDismissed) < GEAR_NAG_SNOOZE_DAYS) return null
+  const picks = gearAdvice(S, S.plannerAnswers, 1)
+  return picks[0] || null
+}
+
+/** "Not now", remembered — inside store.update. */
+export function dismissGearNag(s) { s.gearNagDismissed = todayISO() }

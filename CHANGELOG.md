@@ -1,5 +1,34 @@
 # Changelog
 
+## v2.5.0 — 2026-08-22 — the day of eating, given shape
+
+### Food becomes Meals
+
+- 🍽️ **A Meals tab instead of a calorie pot.** The daily target is split across breakfast,
+  lunch, snacks and dinner by an eating style — Balanced, Vertical diet, Mediterranean,
+  High protein, or 16:8 fasting (which drops breakfast entirely). Each meal shows its share
+  of calories and protein, one plain-language plate suggestion, and what you've logged into
+  it — entries bucket to the nearest mealtime automatically.
+- 🎚️ **The style moves calories, never changes them.** Same total, different day — and the
+  wizard's diet step now asks which style you eat in.
+- 🔥 **Calories out, honestly.** Training days show what the session burned as context —
+  never added to the allowance, because the target's activity assumption already covers
+  training and "exercise earns food" is how tracking apps teach overeating.
+
+### Reminders that ask what you ate
+
+- ⏰ **A menu at each mealtime, a memory prompt after.** On the phone, each meal can send
+  two notifications: the plan at mealtime ("Breakfast — about 550 kcal, 40 g protein. Eggs
+  or yogurt with oats and fruit.") and, an hour and a half later, "What did you eat?" —
+  logging the meal silences the rest of that slot for the day, and tapping one lands you on
+  the Meals screen where the answer goes.
+
+### The kit reminder that keeps coming back
+
+- 🛒 **Worth buying, on Home.** The one purchase most worth making for your goal sits on the
+  Home screen with its reasons and unlock count. "Not now" snoozes it a fortnight — then it
+  returns, because the gap in the kit didn't close when the card did.
+
 ## v2.4.0 — 2026-08-22 — set up in two minutes
 
 ### The first-run setup
