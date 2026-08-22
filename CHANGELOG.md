@@ -1,5 +1,28 @@
 # Changelog
 
+## v2.3.0 — 2026-08-22 — the app that gets you off the sofa
+
+### Notifications that escalate
+
+- 🛋️ **"Get me off the sofa."** On days with a session planned, openGym now starts talking
+  at the time you usually get home and keeps going, one rung meaner an hour, until you
+  train. It opens plan-aware and friendly — *"Pull day. Back and biceps are waiting"* — and
+  ends wherever the tone you picked ends.
+- 🎚️ **You choose how hard it pushes.** *Encouraging* is three gentle nudges and then
+  silence. *Push me* is five, blunt by the last. **Full send** is seven and genuinely
+  swears at you — opt-in, warned about, never a default. A gentler tone also nags less: the
+  rung count *is* the tone.
+- 🏠 **A usual-home time, not a guess you can't correct.** Set when you're normally in and
+  the ladder anchors there. When the guess is wrong, every notification carries a **"Not
+  home"** button: one tap from the shade pushes the rest of the evening back an hour.
+- 🌙 **It shuts up at bedtime.** Set the quiet hour and nothing fires past it. When a tone
+  has more rungs than the evening has hours they tighten up rather than getting cut off —
+  a tone chosen for how it *ends* has to reach the end.
+- 🐘 **It remembers.** Duck the same planned weekday twice running and the next ladder skips
+  the pleasantries, starts a tier in, and says why.
+- 🤫 **Training stops it dead.** Starting or logging a workout cancels the rest of the day's
+  rungs, and rest days never hear a word.
+
 ## v2.2.0 — 2026-08-22 — the plan thinks ahead
 
 ### The back gesture behaves

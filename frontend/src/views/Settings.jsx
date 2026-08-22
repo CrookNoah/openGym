@@ -10,9 +10,10 @@ import { pushSupported, enablePush, disablePush, sendTestPush } from '../lib/pus
 import { wakeLockSupported } from '../lib/wakelock.js'
 import { t, LANGS, INSTR_LANGS } from '../lib/i18n.js'
 import { DEMO, REPO } from '../lib/demo.js'
-import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
+import { MOBILE, shareExport, syncReminder, syncNudges, previewNudge } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp, gearSheet } from '../sheets.jsx'
 import { gearSummary } from '../lib/gear.js'
+import { DEF_NUDGE, TONES, TONE_NAME, TONE_HINT, nudgeSummary } from '../lib/nudge.js'
 import { aiKeySheet, foodTargetSheet } from '../foodsheets.jsx'
 import { planWizardSheet } from '../planner.jsx'
 import { hasKey } from '../lib/foodai.js'
@@ -294,7 +295,7 @@ function MobileReminderCard({ S, update, toast }) {
     }
     setReminder({ on })
   }
-  return (
+  return <>
     <Section title={t('Notifications')}
       footer={S.reminder?.on ? t('Reminds you at this time on days that have a routine planned.') : null}>
       <Row icon="calendar" iconTint="var(--orange)" title={t('Workout day reminder')}>
@@ -307,7 +308,63 @@ function MobileReminderCard({ S, update, toast }) {
         </Row>
       )}
     </Section>
-  )
+    <NudgeCard S={S} update={update} toast={toast} />
+  </>
+}
+
+// The evening ladder (lib/nudge.js). The morning reminder above says "today is a workout
+// day"; this is the one that keeps saying it while you sit on the sofa. Everything it needs
+// is here — when you're in, when to shut up, and how sharp it may get — because a feature
+// that talks to you unprompted owes you every dial it uses.
+function NudgeCard({ S, update, toast }) {
+  const n = { ...DEF_NUDGE, ...(S.nudge || {}) }
+  const setN = patch => update(s => { s.nudge = { ...DEF_NUDGE, ...(s.nudge || {}), ...patch } })
+  const toggle = async () => {
+    if (!n.on) {
+      const ok = await syncNudges({ ...S, nudge: { ...n, on: true } }, true)
+      if (!ok) { toast(t('Could not change notification settings')); return }
+    }
+    setN({ on: !n.on })
+  }
+  const preview = async () => {
+    const ok = await previewNudge({ ...S, nudge: n })
+    toast(ok ? t('Test sent — should arrive any second') : t('Test failed'))
+  }
+  return <>
+    <Section title={t('Get me off the sofa')} footer={nudgeSummary({ ...S, nudge: n })}>
+      <Row icon="flame" iconTint="var(--red)" title={t('Chase me on workout days')}
+        subtitle={t('Escalating reminders from the time you get home, until you train.')}>
+        <Switch checked={!!n.on} onChange={toggle} />
+      </Row>
+      {n.on && <>
+        <Row icon="house" iconTint="var(--green)" title={t('Usually home by')}
+          subtitle={t('Where the ladder starts — tap “Not home” on a notification if the guess is off.')}>
+          <input type="time" className="timef" value={n.home} onChange={e => setN({ home: e.target.value })} />
+        </Row>
+        <Row icon="moon" iconTint="var(--purple)" title={t('Nothing after')}
+          subtitle={t('It shuts up for the night at this time.')}>
+          <input type="time" className="timef" value={n.quiet} onChange={e => setN({ quiet: e.target.value })} />
+        </Row>
+        {/* The tone is the whole character of the feature, so it gets room to explain itself
+            rather than a three-word segment you pick blind — and the sweary one warns you
+            before it earns an uninstall. */}
+        <div className="lrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10, paddingTop: 13, paddingBottom: 14 }}>
+          <span className="lrow-t">{t('How hard should it push?')}</span>
+          <Segmented options={TONES.map(k => ({ value: k, label: t(TONE_NAME[k]) }))}
+            value={n.tone} onChange={v => setN({ tone: v })} />
+          <span className="lrow-s">{t(TONE_HINT[n.tone])}</span>
+          {n.tone === 'full' && <span className="lrow-s" style={{ color: 'var(--yellow)' }}>
+            {t('Full send swears at you, properly. Pick another tone if that is not for you.')}
+          </span>}
+        </div>
+      </>}
+    </Section>
+    {/* The claim, delivered. Reading the worst line on your own lock screen is the only
+        honest way to decide whether you want it there every week. */}
+    {n.on && <div style={{ marginTop: -12, marginBottom: 22 }}>
+      <Button size="sm" icon="bell" onClick={preview}>{t('Send test notification')}</Button>
+    </div>}
+  </>
 }
 
 function PushCard({ S, update, toast }) {

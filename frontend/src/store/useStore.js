@@ -3,7 +3,7 @@ import { api } from '../lib/api.js'
 import { localTZ } from '../lib/format.js'
 import { registerCustom } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
-import { MOBILE, nativeLoad, nativeSave, syncReminder } from '../lib/mobile.js'
+import { MOBILE, nativeLoad, nativeSave, syncReminder, syncNudges } from '../lib/mobile.js'
 
 const KEY = 'gym_state_v1'
 export const DEF = {
@@ -41,7 +41,11 @@ export const DEF = {
   // that a profile which never chose (loaded state is overlaid on DEF, on every path: local,
   // server pull, backup import) still falls back to the `showRir` boolean this replaced and
   // keeps the column it had. See effortOf.
-  reminder: { on: false, time: '08:00', tz: null }, effort: null
+  reminder: { on: false, time: '08:00', tz: null },
+  // The escalating evening nudge (lib/nudge.js): when you're usually home, how late it may
+  // still talk, and how sharp it's allowed to get. Off until asked for, and 'push' rather
+  // than 'full' because the tone that swears at you has to be chosen, never inherited.
+  nudge: { on: false, home: '17:30', quiet: '22:00', tone: 'push', notHome: null }, effort: null
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 
@@ -63,7 +67,7 @@ export const useStore = create((set, get) => {
   // storage eviction) and keep the native reminder schedule in step with the weekly plan.
   const nativePersist = () => {
     clearTimeout(saveTm)
-    saveTm = setTimeout(() => { saveTm = null; nativeSave(get().S); syncReminder(get().S) }, 800)
+    saveTm = setTimeout(() => { saveTm = null; nativeSave(get().S); syncReminder(get().S); syncNudges(get().S) }, 800)
   }
 
   const persist = (S, push = true) => {

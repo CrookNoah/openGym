@@ -10,6 +10,7 @@
 // Like the demo build, MOBILE is replaced at build time, so all of this folds away in
 // web bundles; the Capacitor plugins are only ever imported behind it.
 import { t } from './i18n.js'
+import { nudgeLadder, nudgePreview, NUDGE_ID_BASE, NUDGE_ID_MAX, NUDGE_PREVIEW_ID, NUDGE_ACTION_TYPE, NOT_HOME_ACTION } from './nudge.js'
 
 export const MOBILE = import.meta.env.VITE_MOBILE === '1'
 
@@ -56,6 +57,94 @@ export async function syncReminder(S, interactive = false) {
     if (notifications.length) await LocalNotifications.schedule({ notifications })
     return true
   } catch (e) { return false }
+}
+
+/* ---- the nudge ladder ----
+   The escalating evening reminder (lib/nudge.js). Nothing here decides anything: the ladder
+   is computed from state, this just makes the OS agree with it — cancel the whole reserved
+   id range, schedule what the ladder currently says. That is deliberately blunt rather than
+   clever, because it is the only thing that can be correct: the store re-runs this after
+   every state change, so "a workout was started" and "the plan was edited" and "bedtime
+   moved" all take the same path, and there is never a stale rung left behind that we forgot
+   to cancel by hand.
+
+   Every rung carries the "Not home" button, so the one guess this feature makes about your
+   life — what time you get in — is a single tap to correct rather than a reason to turn the
+   whole thing off. */
+const NUDGE_IDS = []
+for (let i = NUDGE_ID_BASE; i <= NUDGE_ID_MAX; i++) NUDGE_IDS.push({ id: i })
+
+// The store persists on *every* state change — every set ticked, every rep edited — and a
+// blind resync is 70 cancels and a reschedule across the native bridge each time. The ladder
+// is pure, so computing it is free by comparison: if it comes out identical to what is
+// already on the schedule, there is nothing to say to the OS. Mid-workout, when the day's
+// rungs are already gone, that is every single persist.
+let lastSynced = null
+
+export async function syncNudges(S, interactive = false) {
+  try {
+    const want = S?.nudge?.on ? JSON.stringify(nudgeLadder(S)) : '[]'
+    if (!interactive && want === lastSynced) return true
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    await LocalNotifications.cancel({ notifications: NUDGE_IDS }).catch(() => {})
+    lastSynced = want
+    if (!S?.nudge?.on) return true
+    let perm = await LocalNotifications.checkPermissions()
+    if (perm.display !== 'granted' && interactive) perm = await LocalNotifications.requestPermissions()
+    if (perm.display !== 'granted') { lastSynced = null; return false }
+    // Re-registered on every sync rather than once at boot: the button is a translated
+    // string, and a language switch has to reach the notifications already on the schedule.
+    await LocalNotifications.registerActionTypes({
+      types: [{ id: NUDGE_ACTION_TYPE, actions: [{ id: NOT_HOME_ACTION, title: t('Not home') }] }],
+    }).catch(() => {})
+    const list = JSON.parse(want).map(n => ({
+      id: n.id,
+      title: n.title,
+      body: n.body,
+      actionTypeId: NUDGE_ACTION_TYPE,
+      extra: { iso: n.iso },
+      schedule: { at: new Date(n.at), allowWhileIdle: true },
+    }))
+    if (list.length) await LocalNotifications.schedule({ notifications: list })
+    return true
+  } catch (e) { lastSynced = null; return false }
+}
+
+// Fire the tone's harshest line right now, so it can be read before it is lived with.
+export async function previewNudge(S) {
+  try {
+    const msg = nudgePreview(S)
+    if (!msg) return false
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    let perm = await LocalNotifications.checkPermissions()
+    if (perm.display !== 'granted') perm = await LocalNotifications.requestPermissions()
+    if (perm.display !== 'granted') return false
+    await LocalNotifications.registerActionTypes({
+      types: [{ id: NUDGE_ACTION_TYPE, actions: [{ id: NOT_HOME_ACTION, title: t('Not home') }] }],
+    }).catch(() => {})
+    await LocalNotifications.schedule({
+      notifications: [{
+        id: NUDGE_PREVIEW_ID, title: msg.title, body: msg.body,
+        actionTypeId: NUDGE_ACTION_TYPE, extra: {},
+        schedule: { at: new Date(Date.now() + 2000), allowWhileIdle: true },
+      }],
+    })
+    return true
+  } catch (e) { return false }
+}
+
+// "Not home" tapped from the shade: hand the day back to the caller, which defers it in
+// state — and the resulting persist reschedules the rest of the evening an hour later.
+let nudgeWired = false
+export async function wireNudgeActions(onNotHome) {
+  if (!MOBILE || nudgeWired) return
+  nudgeWired = true
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    LocalNotifications.addListener('localNotificationActionPerformed', ev => {
+      if (ev?.actionId === NOT_HOME_ACTION) onNotHome(ev?.notification?.extra?.iso || null)
+    })
+  } catch (e) { /* web build */ }
 }
 
 // WKWebView can't do blob-URL downloads, so the backup goes out through the OS share sheet

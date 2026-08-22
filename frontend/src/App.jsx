@@ -3,11 +3,12 @@ import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'r
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { bindUI } from './components/ui.jsx'
-import { ACCENTS } from './lib/format.js'
-import { setLang, useLang } from './lib/i18n.js'
+import { ACCENTS, todayISO } from './lib/format.js'
+import { setLang, useLang, t } from './lib/i18n.js'
 import { setNav } from './lib/nav.js'
+import { deferToday } from './lib/nudge.js'
 import { useWakeLock } from './lib/wakelock.js'
-import { wireBackButton, minimizeApp } from './lib/mobile.js'
+import { wireBackButton, minimizeApp, wireNudgeActions } from './lib/mobile.js'
 import { startFlow } from './sheets.jsx'
 import Icon from './components/Icon.jsx'
 import TabBar from './components/TabBar.jsx'
@@ -61,6 +62,14 @@ function Shell() {
       if (top) { if (!top.locked) ui.closeSheet(top.id); return }
       if (window.location.hash.replace(/^#/, '') !== '/home') { window.history.back(); return }
       minimizeApp()
+    })
+  }, [])
+  // "Not home" from the notification shade: the ladder's one guess about your life, corrected
+  // in a tap. Deferring is a state change, so the reschedule comes free with the persist.
+  useEffect(() => {
+    wireNudgeActions(iso => {
+      useStore.getState().update(s => deferToday(s, iso || todayISO()))
+      useUI.getState().toast(t('Pushed back an hour. Enjoy the commute.'))
     })
   }, [])
 
