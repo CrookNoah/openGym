@@ -11,6 +11,8 @@ import { dayTotals, targetOf, MACROS, MACRO_NAME } from '../lib/food.js'
 import { easyWeekActive } from '../lib/progression.js'
 import { suggestEasyWeek, dismissEasyWeek } from '../lib/fatigue.js'
 import { gearNag, dismissGearNag } from '../lib/setup.js'
+import { GoalCard, goalSetupSheet } from '../goalsheets.jsx'
+import { hasGoal } from '../lib/goal.js'
 import { routineMuscles } from '../lib/week.js'
 import { MUSCLE_NAME } from '../lib/muscles.js'
 import LineChart from '../components/LineChart.jsx'
@@ -81,6 +83,23 @@ export default function Home() {
       <div><h1>{user ? t('Hi {0}', user.name) : 'openGym'}</h1><div className="sub">{today.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
       <button className="iconbtn" onClick={() => nav('/settings')} aria-label={t('Settings')}><Icon name="gear" /></button>
     </div>
+
+    {/* Pinned above everything while a goal is live: it is what every other card on this
+        screen is in service of, and putting it under the week strip said otherwise. */}
+    <GoalCard />
+
+    {/* No goal yet, but a weigh-in to build one from — offered quietly, and gone for good
+        the moment a goal exists. */}
+    {!hasGoal(S) && S.bodyweight.length > 0 && <div className="card tappable" style={{ cursor: 'pointer' }} onClick={goalSetupSheet}>
+      <div className="row" style={{ gap: 9 }}>
+        <span className="lrow-i" style={{ background: 'var(--yellow)' }}><Icon name="target" /></span>
+        <div className="grow">
+          <div className="tt">{t('Set a goal')}</div>
+          <div className="ss">{t('Lose, gain or hold — openGym tracks the trend and tells you honestly whether it is working.')}</div>
+        </div>
+        <Icon name="chevronRight" className="chev" />
+      </div>
+    </div>}
 
     <div className="card">
       <div className="row between" style={{ marginBottom: 8 }}>

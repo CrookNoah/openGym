@@ -8,7 +8,7 @@ import { setLang, useLang, t } from './lib/i18n.js'
 import { setNav } from './lib/nav.js'
 import { deferToday } from './lib/nudge.js'
 import { useWakeLock } from './lib/wakelock.js'
-import { wireBackButton, minimizeApp, wireNudgeActions, wireMealActions } from './lib/mobile.js'
+import { wireBackButton, minimizeApp, wireNudgeActions, wireMealActions, wireGoalActions } from './lib/mobile.js'
 import { startFlow } from './sheets.jsx'
 import { maybeStartSetup } from './setup.jsx'
 import Icon from './components/Icon.jsx'
@@ -75,6 +75,9 @@ function Shell() {
     // A tapped meal reminder lands on the Meals screen — it asked what you ate; this is
     // where the answer goes.
     wireMealActions(() => navigate('/food'))
+    // Weigh-in prompt or Sunday check-in: Home is where the goal card lives, and both the
+    // weigh-in button and the week's verdict are already on it.
+    wireGoalActions(() => navigate('/home'))
   }, [])
 
   const authed = user || isGuest

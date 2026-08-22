@@ -12,6 +12,7 @@
 import { t } from './i18n.js'
 import { nudgeLadder, nudgePreview, NUDGE_ID_BASE, NUDGE_ID_MAX, NUDGE_PREVIEW_ID, NUDGE_ACTION_TYPE, NOT_HOME_ACTION } from './nudge.js'
 import { mealReminders, MEAL_ID_BASE, MEAL_ID_MAX } from './meals.js'
+import { goalReminders, GOAL_ID_BASE, GOAL_ID_MAX } from './goal.js'
 
 export const MOBILE = import.meta.env.VITE_MOBILE === '1'
 
@@ -176,6 +177,53 @@ export async function wireMealActions(onOpen) {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
     LocalNotifications.addListener('localNotificationActionPerformed', ev => {
       if (ev?.notification?.actionTypeId === MEAL_ACTION_TYPE) onOpen(ev?.notification?.extra?.iso || null)
+    })
+  } catch (e) { /* web build */ }
+}
+
+/* ---- the goal ----
+   The morning weigh-in prompt and the Sunday check-in (lib/goal.js). Same shape as the
+   other two schedulers, and deliberately the smallest of the three: a goal that talks more
+   than twice a day is a goal people mute. It rides the nudge master switch rather than
+   adding a fourth thing to configure. */
+const GOAL_IDS = []
+for (let i = GOAL_ID_BASE; i <= GOAL_ID_MAX; i++) GOAL_IDS.push({ id: i })
+export const GOAL_ACTION_TYPE = 'goal'
+let lastGoal = null
+
+export async function syncGoal(S, interactive = false) {
+  try {
+    const want = JSON.stringify(goalReminders(S))
+    if (!interactive && want === lastGoal) return true
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    await LocalNotifications.cancel({ notifications: GOAL_IDS }).catch(() => {})
+    lastGoal = want
+    const list = JSON.parse(want)
+    if (!list.length) return true
+    let perm = await LocalNotifications.checkPermissions()
+    if (perm.display !== 'granted' && interactive) perm = await LocalNotifications.requestPermissions()
+    if (perm.display !== 'granted') { lastGoal = null; return false }
+    await LocalNotifications.schedule({
+      notifications: list.map(n => ({
+        id: n.id, title: n.title, body: n.body,
+        actionTypeId: GOAL_ACTION_TYPE, extra: { kind: n.kind },
+        schedule: { at: new Date(n.at), allowWhileIdle: true },
+      })),
+    })
+    return true
+  } catch (e) { lastGoal = null; return false }
+}
+
+// Tapping either one lands on Home, where the goal card is — the weigh-in button and the
+// week's verdict are both already there.
+let goalWired = false
+export async function wireGoalActions(onOpen) {
+  if (!MOBILE || goalWired) return
+  goalWired = true
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    LocalNotifications.addListener('localNotificationActionPerformed', ev => {
+      if (ev?.notification?.actionTypeId === GOAL_ACTION_TYPE) onOpen(ev?.notification?.extra?.kind || null)
     })
   } catch (e) { /* web build */ }
 }
