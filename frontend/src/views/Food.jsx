@@ -11,6 +11,7 @@ import { addFoodSheet, foodFormSheet, foodTargetSheet, mealPlanSheet } from '../
 import { mealPlanFor, mealsOf, SLOT_NAME } from '../lib/meals.js'
 import { sessionBurn, kgOf } from '../lib/setup.js'
 import { lastBW } from '../lib/history.js'
+import { goalOf } from '../lib/goal.js'
 import { useUI } from '../store/useUI.js'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
@@ -72,6 +73,17 @@ export default function Food() {
       {tgt && tgt.kcal > 0 && <div className="wprog" style={{ marginTop: 8 }}>
         <i style={{ width: pct * 100 + '%', background: over ? 'var(--yellow)' : undefined }} />
       </div>}
+      {/* Whose number this is. A target with a goal behind it reads differently from one
+          somebody typed into a settings screen and forgot. */}
+      {(() => {
+        const g = goalOf(S)
+        if (!g || !tgt || !(tgt.kcal > 0) || !isToday) return null
+        return <div className="small dim" style={{ marginTop: 8 }}>
+          {over
+            ? t('Over your goal target for today.')
+            : t('{0} kcal still inside your goal target for today.', fmtNum(left.kcal))}
+        </div>
+      })()}
       {/* Calories out, as context only. The target's activity assumption already includes
           training — a burn that "earns" extra food is how tracking apps teach overeating. */}
       {(() => {

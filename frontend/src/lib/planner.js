@@ -31,8 +31,13 @@ export const GOALS = [
     reps: [8, 12], rungBias: 0, setsMul: 1.15, restSec: 90, rir: 2 },
   { key: 'strength', name: 'Get stronger', hint: 'Harder variations, fewer reps, longer rests.',
     reps: [5, 8], rungBias: 0.12, setsMul: 1, restSec: 150, rir: 1 },
-  { key: 'lean', name: 'Lose fat, keep muscle', hint: 'Higher reps and short rests, so sessions keep your heart rate up.',
-    reps: [10, 15], rungBias: -0.12, setsMul: 1, restSec: 60, rir: 2 },
+  // No rung bias, deliberately. Fat loss comes from the calorie deficit; training in a
+  // deficit is what decides whether the weight you lose is fat or muscle, and biasing
+  // someone toward *easier* variations exactly when they need to hold intensity is the
+  // popular-fitness answer rather than the correct one. Higher reps and short rests stay —
+  // they make the sessions denser — but the difficulty does not drop.
+  { key: 'lean', name: 'Lose fat, keep muscle', hint: 'Higher reps and short rests, at the same difficulty — the deficit takes the fat, the training keeps the muscle.',
+    reps: [10, 15], rungBias: 0, setsMul: 1, restSec: 60, rir: 2 },
   { key: 'fitness', name: 'General fitness', hint: 'A bit of everything, and the least fussy about hitting numbers.',
     reps: [8, 15], rungBias: 0, setsMul: 0.85, restSec: 75, rir: 3 },
 ]

@@ -31,6 +31,7 @@
 import { isoOf, DAYN } from './format.js'
 import { effectiveRoutineId } from './history.js'
 import { missedPlanned, routineMuscles } from './week.js'
+import { goalOf, goalProgress } from './goal.js'
 import { MUSCLE_NAME } from './muscles.js'
 import { t } from './i18n.js'
 
@@ -169,6 +170,13 @@ export function nudgeLadder(S, now = Date.now(), days = 7) {
   const routines = S.routines || []
   const trained = new Set((S.workouts || []).map(w => w.d))
   const grudge = grudgeDays(S)
+  // Computed once for the whole ladder rather than per rung — goalProgress walks the
+  // weigh-in history, and this runs on every persist.
+  const g = goalOf(S)
+  const gp = g ? goalProgress(S, now) : null
+  const goalNote = gp && gp.total > 0 && gp.done > 0
+    ? t('You are {0} of {1} {2} in — this is the session that keeps that going.', Math.abs(gp.done), gp.total, S.unit || 'lb')
+    : null
   const out = []
 
   for (let k = 0; k < days; k++) {
@@ -207,6 +215,10 @@ export function nudgeLadder(S, now = Date.now(), days = 7) {
       const msg = rungs[r]
       let body = t(msg.body, name, muscles)
       if (base && r === base) body = t('Second {0} running you have ducked. Starting where we left off.', t(DAYN[weekday])) + ' ' + body
+      // The first rung of the day says what the session is *for*, when there is a goal to
+      // say it about. A reminder that knows you are eleven pounds into a twenty-pound cut
+      // is a different message from one that just knows it is Tuesday.
+      else if (i === 0 && goalNote) body += ' ' + goalNote
       out.push({
         id: NUDGE_ID_BASE + k * 10 + i,
         iso, weekday, rung: i, tier: r, at: ms,

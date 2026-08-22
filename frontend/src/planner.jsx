@@ -20,6 +20,7 @@ import {
   generatePlan, applyPlan, splitName,
 } from './lib/planner.js'
 import { gearSummary, gearChosen } from './lib/gear.js'
+import { goalOf } from './lib/goal.js'
 import { gearSheet, confirmSheet } from './sheets.jsx'
 import Icon from './components/Icon.jsx'
 import { glyphOf } from './lib/glyphs.js'
@@ -53,6 +54,19 @@ function PlanWizard({ close, onDone }) {
       <SelectRow icon="target" iconTint="var(--acc)" title={t('What are you after?')} sheetTitle={t('Your goal')}
         value={a.goal} onChange={v => set('goal', v)}
         options={GOALS.map(g => ({ value: g.key, label: t(g.name), subtitle: t(g.hint) }))} />
+      {/* The honest note, not an override: fat loss is decided at the table, and the point
+          of training in a deficit is keeping what the deficit would otherwise take. Someone
+          who wants conditioning can still pick it — they just should not believe the
+          training is what makes them lean. */}
+      {(() => {
+        const g = goalOf(st)
+        if (!g || g.kind !== 'lose') return null
+        return <div className="small" style={{ color: 'var(--label-2)', margin: '6px 2px 0', lineHeight: 1.45 }}>
+          {a.goal === 'muscle' || a.goal === 'strength'
+            ? t('Good fit while losing weight: the deficit takes the fat, and training this way is what keeps the muscle.')
+            : t('You are losing weight. The deficit does that — so "Build muscle" or "Get stronger" here will hold on to more of you while it happens.')}
+        </div>
+      })()}
       <SelectRow icon="figureStrength" iconTint="var(--blue)" title={t('How much have you trained?')} sheetTitle={t('Experience')}
         value={a.level} onChange={v => set('level', v)}
         options={LEVELS.map(l => ({ value: l.key, label: t(l.name), subtitle: t(l.hint) }))} />
