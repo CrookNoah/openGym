@@ -109,7 +109,7 @@ export default function Plan() {
     <div className="hdr">
       <div><h1>{t('Plan')}</h1><div className="sub">{t('Your weekly routine')}</div></div>
       <div className="row" style={{ gap: 6 }}>
-        <button className="iconbtn" onClick={planWizardSheet} aria-label={t('Build me a plan')} title={t('Build me a plan')}><Icon name="sparkles" /></button>
+        <button className="iconbtn" onClick={() => planWizardSheet()} aria-label={t('Build me a plan')} title={t('Build me a plan')}><Icon name="sparkles" /></button>
         <button className="iconbtn" onClick={planToolsSheet} aria-label={t('Share your plan')} title={t('Share your plan')}><Icon name="upload" /></button>
       </div>
     </div>
@@ -154,7 +154,7 @@ export default function Plan() {
         </div>
         <Icon name="chevronRight" className="chev" /></div>)}</div> : <>
         <div className="empty"><div className="ico"><Icon name="clipboard" /></div>{t('No routines yet.')}<br />{t('Let openGym build one, or start from scratch.')}</div>
-        <Button variant="primary" icon="sparkles" onClick={planWizardSheet}>{t('Build me a plan')}</Button>
+        <Button variant="primary" icon="sparkles" onClick={() => planWizardSheet()}>{t('Build me a plan')}</Button>
         <div style={{ height: 8 }} />
         <Button onClick={loadStarterPlan}>{t('Or pick a ready-made plan')}</Button>
       </>}

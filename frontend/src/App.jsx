@@ -10,6 +10,7 @@ import { deferToday } from './lib/nudge.js'
 import { useWakeLock } from './lib/wakelock.js'
 import { wireBackButton, minimizeApp, wireNudgeActions } from './lib/mobile.js'
 import { startFlow } from './sheets.jsx'
+import { maybeStartSetup } from './setup.jsx'
 import Icon from './components/Icon.jsx'
 import TabBar from './components/TabBar.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
@@ -74,6 +75,10 @@ function Shell() {
   }, [])
 
   const authed = user || isGuest
+  // First run on a blank profile: offer the setup flow once the state has actually loaded —
+  // on mobile the file restore can land after first paint, and offering setup to a profile
+  // that is still arriving would greet a returning user like a stranger.
+  useEffect(() => { if (ready && authed) maybeStartSetup() }, [ready, authed])
   if (!ready && !authed) return (
     <div id="app">
       <div style={{ paddingTop: '44vh', display: 'flex', justifyContent: 'center', fontSize: 34, color: 'var(--label-3)' }}>

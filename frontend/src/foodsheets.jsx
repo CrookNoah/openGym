@@ -24,7 +24,7 @@ const toast = m => ui().toast(m)
 /* ============================ the four numbers ============================ */
 // Shared by every way in: type it, pick it from the database, accept an AI estimate. The
 // last two pre-fill it — which is the point. Nothing is logged you have not seen.
-function MacroFields({ v, setV }) {
+export function MacroFields({ v, setV }) {
   const implied = kcalFromMacros(v)
   const off = v.kcal > 0 && implied > 0 && Math.abs(implied - v.kcal) > Math.max(30, v.kcal * 0.15)
   return <>

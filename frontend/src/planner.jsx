@@ -31,7 +31,7 @@ const update = (...a) => useStore.getState().update(...a)
 const toast = m => ui().toast(m)
 
 /* ============================ the questions ============================ */
-function PlanWizard({ close }) {
+function PlanWizard({ close, onDone }) {
   const st = useStore(s => s.S)
   const [a, setA] = useState(() => ({ ...DEFAULT_ANSWERS, ...(st.plannerAnswers || {}) }))
   const set = (k, v) => setA(x => ({ ...x, [k]: v }))
@@ -40,7 +40,7 @@ function PlanWizard({ close }) {
     // Remembered so "build me another" does not mean answering everything again.
     update(s => { s.plannerAnswers = { ...a } })
     close()
-    planPreviewSheet(a)
+    planPreviewSheet(a, onDone)
   }
 
   return <>
@@ -113,15 +113,15 @@ function PlanWizard({ close }) {
     {/* The kit decides which exercises exist at all, so it is worth confirming here rather
         than generating a plan around an assumption. */}
     <Row icon="wrench" iconTint="var(--teal)" title={t('Training with')} subtitle={gearSummary(st, t)}
-      accessory="chevron" onClick={() => { close(); gearSheet(() => planWizardSheet()) }} />
+      accessory="chevron" onClick={() => { close(); gearSheet(() => planWizardSheet(onDone)) }} />
     <div style={{ height: 14 }} />
     <Button variant="primary" icon="sparkles" onClick={go}>{t('Build my plan')}</Button>
   </>
 }
-export const planWizardSheet = () => ui().openSheet(close => <PlanWizard close={close} />)
+export const planWizardSheet = onDone => ui().openSheet(close => <PlanWizard close={close} onDone={onDone} />)
 
 /* ============================ the preview ============================ */
-function PlanPreview({ answers, close }) {
+function PlanPreview({ answers, close, onDone }) {
   const st = useStore(s => s.S)
   const [plan] = useState(() => generatePlan(st, answers))
   const [open, setOpen] = useState(0)
@@ -133,6 +133,9 @@ function PlanPreview({ answers, close }) {
     close()
     toast(replace ? t('Plan replaced') : t('Plan added'))
     nav('/plan')
+    // The setup flow threads a continuation through here — the plan step is done, so the
+    // flow can carry on to diet. Absent everywhere else.
+    onDone && onDone()
   }
   const commit = () => {
     if (!hasPlan) return save(true)
@@ -240,7 +243,7 @@ function PlanPreview({ answers, close }) {
     <div style={{ height: 14 }} />
     <Button variant="primary" icon="check" onClick={commit}>{t('Use this plan')}</Button>
     <div style={{ height: 8 }} />
-    <Button icon="reset" onClick={() => { close(); planWizardSheet() }}>{t('Change my answers')}</Button>
+    <Button icon="reset" onClick={() => { close(); planWizardSheet(onDone) }}>{t('Change my answers')}</Button>
   </>
 }
-export const planPreviewSheet = answers => ui().openSheet(close => <PlanPreview answers={answers} close={close} />)
+export const planPreviewSheet = (answers, onDone) => ui().openSheet(close => <PlanPreview answers={answers} close={close} onDone={onDone} />)

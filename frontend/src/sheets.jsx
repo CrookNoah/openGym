@@ -67,8 +67,10 @@ function GearSheet({ onDone, close }) {
     close()
     toast(sel.length ? t('Kit saved') : t('Floor only — the library is filtered to match'))
     // A new pattern is the part of a kit change that a filtered library cannot deliver on its
-    // own: until it is in a routine, it is not being trained.
-    if (picks.length) kitUnlockSheet(picks)
+    // own: until it is in a routine, it is not being trained. Inside a flow (onDone set) the
+    // next step is the plan wizard, which rebuilds the week against the new kit anyway — an
+    // unlock offer here would be answered and then immediately overwritten.
+    if (picks.length && !onDone) kitUnlockSheet(picks)
     onDone && onDone()
   }
   return <>
@@ -86,7 +88,7 @@ function GearSheet({ onDone, close }) {
     <div style={{ height: 14 }} />
     <Button variant="primary" onClick={save}>{sel.length ? t('Save') : t('Floor only')}</Button>
     {gearChosen(st) && <><div style={{ height: 8 }} />
-      <Button variant="ghost" className="dim" onClick={() => { update(s => { s.gear = null }); close(); toast(t('Filter off — showing the whole library')) }}>
+      <Button variant="ghost" className="dim" onClick={() => { update(s => { s.gear = null }); close(); toast(t('Filter off — showing the whole library')); onDone && onDone() }}>
         {t('Show me everything instead')}</Button></>}
   </>
 }
@@ -192,8 +194,8 @@ const W_LO = 1
 const wHi = unit => (unit === 'lb' ? 660 : 300)
 // Where the slider opens for someone with no weigh-in yet — roughly an average adult in
 // whichever unit they are in, so the first drag is a nudge rather than a journey.
-const startWeight = unit => (unit === 'lb' ? 155 : 70)
-function WeightInput({ value, setValue, unit }) {
+export const startWeight = unit => (unit === 'lb' ? 155 : 70)
+export function WeightInput({ value, setValue, unit }) {
   const W_HI = wHi(unit)
   const clamp = x => Math.max(W_LO, Math.min(W_HI, Math.round((x || 0) * 10) / 10))
   const sv = Math.max(W_LO, Math.min(W_HI, value))

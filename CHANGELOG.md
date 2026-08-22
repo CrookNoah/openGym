@@ -1,5 +1,29 @@
 # Changelog
 
+## v2.4.0 — 2026-08-22 — set up in two minutes
+
+### The first-run setup
+
+- 👋 **A fresh install now walks you in.** Welcome sheet, then four steps that feed each
+  other: your weight and where you want it, the kit you own, the plan wizard building your
+  week against that kit, and a day of eating computed from all of it. Skippable, never
+  reappears on its own, and re-runnable any time from Settings → "Run setup again".
+- 🍽️ **Diet targets that come from your goal.** Direction from your goal weight (or the
+  training goal when none is set), a weight-based maintenance estimate, a cut of ~500 kcal
+  or a deliberate +250 surplus, protein at 1.6 g/kg — raised to 2.0 when cutting — fat at a
+  quarter of intake, carbs from what remains. Prefilled into the Food tab's targets, every
+  field editable, floored so it never recommends a crash diet, and honest about being an
+  estimate: watch the weekly weigh-in trend and adjust.
+- 📅 **"Roughly {n} weeks out"** — the goal weight gets a timeline at the recommended pace,
+  and each session's rough calorie burn is shown as context (never double-counted into the
+  intake number).
+- 🛒 **What's worth buying, judged, not listed.** The closing step ranks the kit you don't
+  own by what each purchase would actually unlock for your goal: whole movement patterns
+  first, newly trainable muscles next, then depth on the variation ladders — so a home
+  trainee hears about dip bars and a bench before "buy a barbell", and it never says "buy
+  machines" because that means a gym membership. Every suggestion says why, in training
+  terms, with the count of exercises it unlocks.
+
 ## v2.3.0 — 2026-08-22 — the app that gets you off the sofa
 
 ### Notifications that escalate

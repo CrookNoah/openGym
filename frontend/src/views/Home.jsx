@@ -130,7 +130,7 @@ export default function Home() {
           <div className="big" style={{ fontSize: 22 }}>{t('Welcome!')}</div>
         </div>
         <div className="muted small" style={{ marginBottom: 12 }}>{t('Answer a few questions and openGym will pick the exercises, the sets and reps, and which days to rest.')}</div>
-        <Button variant="primary" icon="sparkles" onClick={planWizardSheet}>{t('Build me a plan')}</Button>
+        <Button variant="primary" icon="sparkles" onClick={() => planWizardSheet()}>{t('Build me a plan')}</Button>
         <div style={{ height: 8 }} /><Button onClick={loadStarterPlan}>{t('Or pick a ready-made plan')}</Button>
         <div style={{ height: 8 }} /><Button variant="ghost" className="dim" onClick={() => nav('/plan')}>{t('Build my own from scratch')}</Button>
       </div>

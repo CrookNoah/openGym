@@ -16,6 +16,7 @@ import { gearSummary } from '../lib/gear.js'
 import { DEF_NUDGE, TONES, TONE_NAME, TONE_HINT, nudgeSummary } from '../lib/nudge.js'
 import { aiKeySheet, foodTargetSheet } from '../foodsheets.jsx'
 import { planWizardSheet } from '../planner.jsx'
+import { runSetup } from '../setup.jsx'
 import { hasKey } from '../lib/foodai.js'
 import { targetOf, MACROS, MACRO_NAME } from '../lib/food.js'
 import Icon from '../components/Icon.jsx'
@@ -202,8 +203,11 @@ export default function Settings() {
 
     {/* ---------- data: fill it, bring things over, back it up, wipe it ---------- */}
     <Section title={t('Data')}>
-      <Row icon="sparkles" iconTint="var(--acc)" title={t('Build me a plan')} subtitle={t('Answer a few questions and openGym designs the week')} accessory="chevron" onClick={planWizardSheet} />
+      <Row icon="sparkles" iconTint="var(--acc)" title={t('Build me a plan')} subtitle={t('Answer a few questions and openGym designs the week')} accessory="chevron" onClick={() => planWizardSheet()} />
       <Row icon="clipboard" iconTint="var(--blue)" title={t('Load a ready-made plan')} accessory="chevron" onClick={loadStarterPlan} />
+      <Row icon="checkCircle" iconTint="var(--green)" title={t('Run setup again')}
+        subtitle={t('Weight and goal, equipment, a fresh plan, diet targets — the first-run walkthrough')}
+        accessory="chevron" onClick={runSetup} />
       <Row icon="moon" iconTint="var(--indigo)" title={t('Take an easy week')}
         subtitle={easyWeekActive(S) ? t('On until {0} — everything is prescribed lighter. Tap to end it now.', fmtDate(S.easyUntil)) : t('Everything at ~60% for a week. Hard training only works with breaks in it.')}
         onClick={() => {

@@ -45,7 +45,10 @@ export const DEF = {
   // The escalating evening nudge (lib/nudge.js): when you're usually home, how late it may
   // still talk, and how sharp it's allowed to get. Off until asked for, and 'push' rather
   // than 'full' because the tone that swears at you has to be chosen, never inherited.
-  nudge: { on: false, home: '17:30', quiet: '22:00', tone: 'push', notHome: null }, effort: null
+  nudge: { on: false, home: '17:30', quiet: '22:00', tone: 'push', notHome: null },
+  // Day the first-run setup flow was started or skipped (lib/setup.js). Null = never seen
+  // it, which on a blank profile is what makes the welcome sheet appear.
+  setupDone: null, effort: null
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 
