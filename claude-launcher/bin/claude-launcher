@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# claude-launcher — pick a project, land in Claude.
+#
+#   claude-launcher toggle          summon / dismiss the widget  (bind this)
+#   claude-launcher open|close
+#   claude-launcher new             scaffold a project, then launch it
+#   claude-launcher launch <path>   skip the UI, open one project
+#   claude-launcher scan [--print]  rebuild the project cache
+#   claude-launcher theme           re-sync colours from the Omarchy theme
+#   claude-launcher doctor          check dependencies and roots
+#   claude-launcher feed            (internal) eww deflisten target
+#   claude-launcher ctl <cmd>       (internal) widget + submap commands
+set -uo pipefail
+
+# Resolve through symlinks so ~/.local/bin/claude-launcher finds libexec/.
+_self="${BASH_SOURCE[0]}"
+while [[ -L $_self ]]; do
+  _dir="$(cd -P "$(dirname "$_self")" && pwd)"
+  _self="$(readlink "$_self")"
+  [[ $_self != /* ]] && _self="$_dir/$_self"
+done
+CL_BIN="$(cd -P "$(dirname "$_self")" && pwd)/$(basename "$_self")"
+CL_ROOT="$(dirname "$(dirname "$CL_BIN")")"
+CL_LIBEXEC="$CL_ROOT/libexec"
+export CL_BIN CL_ROOT CL_LIBEXEC
+
+# shellcheck source=libexec/common.sh
+source "$CL_LIBEXEC/common.sh"
+source "$CL_LIBEXEC/scan.sh"
+source "$CL_LIBEXEC/launch.sh"
+source "$CL_LIBEXEC/window.sh"
+source "$CL_LIBEXEC/feed.sh"
+source "$CL_LIBEXEC/ctl.sh"
+source "$CL_LIBEXEC/new.sh"
+source "$CL_LIBEXEC/theme.sh"
+source "$CL_LIBEXEC/doctor.sh"
+
+# Print the header comment block (everything after the shebang, up to the first
+# non-comment line) as the help text.
+usage() { awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$CL_BIN"; }
+
+cmd="${1-toggle}"; shift || true
+
+case "$cmd" in
+  toggle)        cl_window_toggle ;;
+  open)          cl_window_open ;;
+  close)         cl_close_window ;;
+  new)           cl_dirs; cl_load_config; cl_new_main ;;
+  launch)        [[ -n ${1-} ]] || cl_die "usage: claude-launcher launch <path>"
+                 cl_launch_project "$(cl_expand "$1")" "${2-}" ;;
+  scan)          cl_scan_main "${1-}" ;;
+  theme)         cl_theme_main ;;
+  doctor)        cl_doctor_main ;;
+  feed)          cl_feed_main ;;
+  ctl)           cl_dirs; cl_load_config; cl_ctl_main "$@" ;;
+  -h|--help|help) usage ;;
+  *)             cl_die "unknown command: $cmd (try --help)" ;;
+esac

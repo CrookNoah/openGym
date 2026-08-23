@@ -1,0 +1,65 @@
+# claude-launcher — configuration
+#
+# Copied to ~/.config/claude-launcher/config.toml on install.
+# Every value below is a default; delete a line to keep the default.
+
+[scan]
+# Where to look for git repos. Each root is walked up to `depth` levels.
+roots = ["~/dev", "~/work", "~/src", "~/projects"]
+depth = 3
+
+# Absolute paths (or ~ paths) to never show.
+hidden = []
+
+# Always sorted to the top, in this order.
+pinned = []
+
+# Read branch / dirty state per repo. Turn off if you have very large repos
+# and the list feels slow.
+git_status = true
+
+# Count untracked files toward the "dirty" badge. Off by default — it is the
+# slowest part of a scan and usually just noise.
+untracked = false
+
+# Seconds before the cached project list is refreshed in the background.
+cache_ttl = 300
+
+[launch]
+# auto | alacritty | ghostty | kitty | foot | wezterm | <your own command>
+terminal = "auto"
+
+# Enter resumes the last Claude session for a project when one exists.
+# Shift+Enter always starts fresh. Set false to invert the two.
+resume_by_default = true
+
+# Repos you trust enough to launch with --dangerously-skip-permissions.
+# Claude will not ask before editing files or running commands in these.
+# Leave empty unless you really want that.
+trusted = []
+
+# Appended to every `claude` invocation, e.g. "--model opus".
+extra_args = ""
+
+[new]
+# Where "New project…" creates folders.
+root = "~/dev"
+git_init = true
+initial_commit = true
+
+# Drop a starter CLAUDE.md into new projects.
+scaffold_claude_md = true
+
+# auto | walker | fuzzel | wofi | rofi | gum
+prompter = "auto"
+
+[ui]
+# How many projects the list shows at once.
+max_results = 12
+
+# Where the widget appears: center | top | bottom | top left | top right | ...
+anchor = "center"
+
+# Width and list height live in the widget itself, since eww owns its own
+# layout — edit the `:width` and `:height` values in:
+#   ~/.config/claude-launcher/eww/eww.yuck

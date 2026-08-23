@@ -1,0 +1,165 @@
+// claude-launcher — widget styling
+//
+// This is GTK3 CSS, not browser CSS: no flexbox, no ::before, no
+// backdrop-filter. Spacing comes from eww's :spacing, the frosted look comes
+// from the Hyprland layerrule in hypr/claude-launcher.conf, and depth is done
+// with borders and alpha rather than shadows.
+
+@import "theme";
+
+// GTK's CSS parser wants whole-number channels; sass `mix()` happily produces
+// fractional ones and prints them as percentages, which GTK then drops on the
+// floor. Round every mixed colour back to integers before it reaches the sheet.
+@function solid($c) {
+  @return rgb(round(red($c)), round(green($c)), round(blue($c)));
+}
+
+// ── derived palette ─────────────────────────────────────────────────────────
+$glass:      if($is-light, rgba($bg, 0.86), rgba($bg, 0.78));
+$edge:       rgba($blue, if($is-light, 0.28, 0.20));
+$hairline:   rgba($fg,   0.08);
+$text:       $fg;
+$text-strong:solid(if($is-light, mix($fg, $black, 82%), mix($fg, $white, 55%)));
+$text-dim:   solid(mix($fg, $bg, 52%));
+$text-faint: solid(mix($fg, $bg, 34%));
+$field:      rgba($black, if($is-light, 0.06, 0.28));
+$hover:      rgba($blue, 0.12);
+$active:     rgba($blue, if($is-light, 0.20, 0.17));
+
+$font: "CaskaydiaMono Nerd Font", "JetBrainsMono Nerd Font", "Symbols Nerd Font",
+       "DejaVu Sans Mono", monospace;
+
+* {
+  all: unset;
+  font-family: $font;
+}
+
+window { background-color: transparent; }
+
+// ── shell ───────────────────────────────────────────────────────────────────
+.cl-root {
+  background-color: $glass;
+  border: 1px solid $edge;
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.cl-head {
+  padding: 2px 6px 12px 6px;
+
+  .mark  { color: $magenta; font-size: 15px; }
+  .title { color: $text-strong; font-size: 14px; font-weight: 700; }
+  .count { color: $text-faint; font-size: 11px; }
+}
+
+// ── search ──────────────────────────────────────────────────────────────────
+.cl-search {
+  background-color: $field;
+  border: 1px solid $hairline;
+  border-radius: 11px;
+  padding: 9px 12px;
+  margin-bottom: 10px;
+
+  .search-icon { color: $text-faint; font-size: 14px; }
+
+  .search-input {
+    color: $text-strong;
+    font-size: 13px;
+    caret-color: $green;
+  }
+  .search-input:focus { color: $text-strong; }
+
+  // GTK3 styles the selection through a sub-node, not a property.
+  .search-input selection {
+    background-color: rgba($blue, 0.35);
+    color: $text-strong;
+  }
+}
+
+// ── rows ────────────────────────────────────────────────────────────────────
+.cl-scroll { min-height: 120px; }
+
+.row {
+  border-radius: 11px;
+  transition: background-color 120ms ease;
+
+  .row-inner {
+    padding: 8px 10px;
+    // Reserved so selecting a row does not shift its contents sideways.
+    border-left: 2px solid transparent;
+  }
+
+  .name  { color: $text-strong; font-size: 13px; font-weight: 600; }
+  .meta  { color: $text-dim;    font-size: 11px; margin-top: 2px; }
+  .ago   { color: $text-faint;  font-size: 11px; }
+  .badge { color: $magenta;     font-size: 13px; }
+
+  .glyph {
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 30px;
+    min-height: 30px;
+    border-radius: 9px;
+    color: $blue;
+    background-color: rgba($blue, 0.16);
+  }
+}
+
+.row:hover { background-color: $hover; }
+
+.row.sel {
+  background-color: $active;
+
+  .row-inner { border-left: 2px solid $blue; }
+  .name      { color: $blue; }
+}
+
+// New-project row reads as an action, not a repo.
+.row.new {
+  margin-top: 6px;
+  border-top: 1px solid $hairline;
+  padding-top: 6px;
+
+  .name  { color: $blue; }
+  .glyph { color: $blue; background-color: rgba($blue, 0.14); font-size: 15px; }
+}
+.row.new.sel .name { color: $blue; }
+
+// ── language badges ─────────────────────────────────────────────────────────
+// Tinted from the terminal palette so every Omarchy theme stays coherent.
+@mixin badge($c) { color: $c; background-color: rgba($c, 0.16); }
+
+.lang-ts   { @include badge($cyan); }
+.lang-js   { @include badge($yellow); }
+.lang-py   { @include badge($blue); }
+.lang-go   { @include badge($cyan); }
+.lang-rs   { @include badge($red); }
+.lang-java { @include badge($red); }
+.lang-rb   { @include badge($red); }
+.lang-php  { @include badge($magenta); }
+.lang-dart { @include badge($cyan); }
+.lang-nix  { @include badge($blue); }
+.lang-c    { @include badge($white); }
+.lang-sh   { @include badge($green); }
+.lang-git  { @include badge(solid(mix($fg, $bg, 45%))); }
+
+// ── footer ──────────────────────────────────────────────────────────────────
+.cl-foot {
+  padding: 12px 6px 2px 6px;
+  margin-top: 8px;
+  border-top: 1px solid $hairline;
+
+  .key   { color: $text-faint; font-size: 10px; }
+  .brand { color: rgba($magenta, 0.55); font-size: 10px; }
+}
+
+// ── scrollbar ───────────────────────────────────────────────────────────────
+scrollbar {
+  background-color: transparent;
+  slider {
+    background-color: rgba($fg, 0.16);
+    border-radius: 10px;
+    min-width: 5px;
+  }
+  slider:hover { background-color: rgba($fg, 0.28); }
+}
